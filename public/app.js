@@ -22,6 +22,7 @@ let reports = [];
 let reportIdCounter = 1;
 let currentCompletingId = null;
 let currentUser = null;
+let currentReportImage = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -129,7 +130,8 @@ function handleReportSubmit(e) {
         doNumber: null,
         releaseDate: null,
         approvedBy: null,
-        approvedAt: null
+        approvedAt: null,
+        image: currentReportImage
     };
 
     reports.unshift(newReport);
@@ -137,6 +139,7 @@ function handleReportSubmit(e) {
     e.target.reset();
     document.getElementById('file-label').textContent = "Choose File...";
     document.getElementById('image-preview').classList.add('hidden');
+    currentReportImage = null;
 
     // Reset Default Date
     document.getElementById('report-date').valueAsDate = new Date();
@@ -196,6 +199,7 @@ function renderWorklist() {
             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                 Lot: ${report.lotNumber} | Exp: ${report.expiryDate}
             </div>
+            ${report.image ? `<div class="report-image-thumb"><img src="${report.image}" alt="Defect" onclick="window.openWithImage(this.src)"></div>` : ''}
             <div class="report-anomalies">
                 ${anomaliesHtml}
             </div>
@@ -209,6 +213,16 @@ function renderWorklist() {
 }
 
 // --- Completion Helpers --- //
+
+window.openWithImage = (src) => {
+    const w = window.open("");
+    w.document.write(`<img src="${src}" style="max-width: 100%; height: auto;">`);
+};
+
+window.openWithImage = (src) => {
+    const w = window.open("");
+    w.document.write(`<img src="${src}" style="max-width: 100%; height: auto;">`);
+};
 
 window.openCompletionModal = (id) => {
     currentCompletingId = id;
@@ -284,6 +298,7 @@ function handleFileUpload(e) {
             const img = document.getElementById('image-preview');
             img.innerHTML = `<img src="${e.target.result}" alt="Disc Preview">`;
             img.classList.remove('hidden');
+            currentReportImage = e.target.result;
         };
         reader.readAsDataURL(file);
     }
