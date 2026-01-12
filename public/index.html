@@ -125,7 +125,10 @@
             <section class="card worklist-panel">
                 <div class="card-header">
                     <h2>Worklist</h2>
-                    <span class="badge" id="active-count">0 Active</span>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span class="badge" id="active-count">0 Active</span>
+                        <button id="export-btn" class="btn-secondary btn-small">Export CSV</button>
+                    </div>
                 </div>
                 <div class="card-content scrollable">
                     <div id="report-list" class="report-list">

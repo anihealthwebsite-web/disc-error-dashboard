@@ -52,6 +52,9 @@ function setupEventListeners() {
     // Modal
     document.getElementById('cancel-modal').addEventListener('click', closeModal);
     document.getElementById('confirm-complete').addEventListener('click', confirmCompletion);
+
+    // Export
+    document.getElementById('export-btn').addEventListener('click', exportToCSV);
 }
 
 // --- Auth Functions --- //
@@ -210,6 +213,57 @@ function renderWorklist() {
         `;
         listContainer.appendChild(card);
     });
+}
+
+    });
+}
+
+function exportToCSV() {
+    if (reports.length === 0) {
+        alert("No reports to export.");
+        return;
+    }
+
+    // CSV Header
+    const headers = [
+        "ID", "Status", "Clinic", "Sales Person", "Disc Type",
+        "Lot Number", "Expiry Date", "Date of Error", "Date Reported",
+        "Anomalies", "DO Number", "Release Date", "Approved By"
+    ];
+
+    // CSV Rows
+    const rows = reports.map(r => [
+        r.id,
+        r.status,
+        `"${r.clinic}"`, // Quote strings to handle commas
+        `"${r.sales}"`,
+        `"${r.discType}"`,
+        `"${r.lotNumber}"`,
+        r.expiryDate,
+        r.errorDate,
+        r.reportDate,
+        `"${r.anomalies.join(', ')}"`,
+        r.doNumber || '',
+        r.releaseDate || '',
+        r.approvedBy || ''
+    ]);
+
+    // Combine
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create Download Link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Disc_Reports_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // --- Completion Helpers --- //
