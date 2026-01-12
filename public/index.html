@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioChem Analyzer Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts for premium typography -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="glass-background"></div>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>BioChem <span class="highlight">Analyzer</span> Monitor</h1>
+            </div>
+            <div class="system-status">
+                <div class="user-info hidden" id="user-info">
+                    <span id="welcome-msg">Welcome, User</span>
+                    <button id="logout-btn" class="btn-secondary btn-small">Logout</button>
+                </div>
+                <span class="divider">|</span>
+                <span class="status-indicator online"></span>
+                <span>System Online</span>
+                <span class="time-display" id="clock">--:--:--</span>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Left Panel: Disc Error Reporting Form -->
+            <section class="card error-panel">
+                <div class="card-header">
+                    <h2>New Disc Error Report</h2>
+                </div>
+                <div class="card-content">
+                    <form id="report-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="clinic-name">Clinic Name</label>
+                                <input type="text" id="clinic-name" placeholder="Enter clinic name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="sales-person">Sales Person</label>
+                                <input type="text" id="sales-person" placeholder="Enter name" required>
+                            </div>
+                        </div>
+
+                        <!-- New Disc ID Fields -->
+                        <div class="form-group">
+                            <label for="disc-type">Type of Disc</label>
+                            <select id="disc-type" required>
+                                <option value="" disabled selected>Select Disc Type</option>
+                                <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
+                                <option value="Diagnosis / Health Check Panel">Diagnosis / Health Check Panel</option>
+                                <option value="Preanesthetic Evaluation Panel">Preanesthetic Evaluation Panel</option>
+                                <option value="Liver Recheck Panel">Liver Recheck Panel</option>
+                                <option value="Kidney Recheck Panel">Kidney Recheck Panel</option>
+                                <option value="Electrolyte Panel">Electrolyte Panel</option>
+                                <option value="Avian/Reptilian Panel">Avian/Reptilian Panel</option>
+                                <option value="Large Animal Panel">Large Animal Panel</option>
+                                <option value="Equine Panel">Equine Panel</option>
+                                <option value="Canine Inflammation Panel">Canine Inflammation Panel</option>
+                                <option value="Feline Inflammation Panel">Feline Inflammation Panel</option>
+                                <option value="Vetube30 Health Checking Disc">Vetube30 Health Checking Disc</option>
+                                <option value="Vetube30 Pre-anesthetic Disc">Vetube30 Pre-anesthetic Disc</option>
+                                <option value="Vetube30 Electrolyte Disc">Vetube30 Electrolyte Disc</option>
+                                <option value="Vetube30 Liver Profile Disc">Vetube30 Liver Profile Disc</option>
+                                <option value="Vetube30 Kidney Profile Disc">Vetube30 Kidney Profile Disc</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="lot-number">Lot Number</label>
+                                <input type="text" id="lot-number" placeholder="Enter Lot #" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="disc-expiry">Disc Expiry Date</label>
+                                <input type="date" id="disc-expiry" required>
+                            </div>
+                        </div>
+
+                        <!-- Dates -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="error-date">Date of Error</label>
+                                <input type="date" id="error-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="report-date">Date Reported</label>
+                                <input type="date" id="report-date" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Anomalies Observed (Select all that apply)</label>
+                            <div class="checkbox-group" id="anomaly-checkboxes">
+                                <!-- JS will populate this -->
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Upload Photo of Disc</label>
+                            <div class="file-upload-wrapper">
+                                <div class="file-upload-ui">
+                                    <span id="file-label">Choose File...</span>
+                                    <input type="file" id="disc-photo" accept="image/*">
+                                </div>
+                                <div id="image-preview" class="hidden"></div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-primary">Submit Report</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Right Panel: Worklist / History -->
+            <section class="card worklist-panel">
+                <div class="card-header">
+                    <h2>Worklist</h2>
+                    <span class="badge" id="active-count">0 Active</span>
+                </div>
+                <div class="card-content scrollable">
+                    <div id="report-list" class="report-list">
+                        <!-- Reports populated by JS -->
+                        <div class="empty-state">No active reports</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content login-content">
+            <div class="login-header">
+                <h2>BioChem Monitor</h2>
+                <p>Please sign in to continue</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                <div id="login-error" class="error-message hidden">Invalid credentials</div>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Completion Modal -->
+    <div id="completion-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Mark as Completed</h3>
+            <p>Please enter the DO Number and Release Date.</p>
+            <div class="form-group">
+                <label for="do-number">DO Number</label>
+                <input type="text" id="do-number" placeholder="Enter Delivery Order Number" required>
+            </div>
+            <div class="form-group">
+                <label for="release-date">Disc Release Date</label>
+                <input type="date" id="release-date" required>
+            </div>
+            <div id="completion-error" class="error-message hidden">Both DO Number and Release Date are required.</div>
+            <div class="modal-actions">
+                <button id="cancel-modal" class="btn-secondary">Cancel</button>
+                <button id="confirm-complete" class="btn-primary">Confirm & Archive</button>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>
