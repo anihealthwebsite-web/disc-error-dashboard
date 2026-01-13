@@ -1,5 +1,9 @@
-// Data & Config
-const anomalyData = {
+// ==========================================
+// EMERGENCY OVERWRITE: ROBUST APP LOGIC
+// ==========================================
+
+// --- 1. HARDCODED DATA (No External Fetching) ---
+const ANOMALY_LIST = {
     "1": "Partial absence of reagent ball",
     "2": "Diluent not enough",
     "3": "Lyophilization reagent deterioration",
@@ -12,25 +16,117 @@ const anomalyData = {
     "10": "Disk Error"
 };
 
-// --- Supabase Config & Init (Moved here for reliability) ---
 const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
 
-let supabase;
-if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
-    console.error('Supabase Library not loaded! Check index.html');
-    alert('Critical Error: Supabase library not loaded. Please refresh.');
+// Global State
+let supabase = null;
+let currentFile = null;
+
+// --- 2. INITIALIZATION (Immediate & Robust) ---
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("🚀 App Initializing...");
+
+    // A. status UI Force
+    const welcomeMsg = document.getElementById('welcome-msg');
+    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online (Emergency Mode)";
+
+    // B. Initialize Supabase
+    if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("✅ Supabase Client Ready");
+    } else {
+        alert("CRITICAL: Supabase Library Missing");
+    }
+
+    // C. Render Lists Immediately
+    renderAnomalies();
+
+    // D. Setup Event Listeners
+    setupEvents();
+
+    // E. Start Polling Worklist (5s)
+    loadWorklist(); // Initial load
+    setInterval(loadWorklist, 5000);
+});
+
+// --- 3. UI RENDERING ---
+function renderAnomalies() {
+    const container = document.getElementById('anomaly-checkboxes');
+    if (!container) return;
+
+    container.innerHTML = '';
+    Object.keys(ANOMALY_LIST).forEach(key => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.innerHTML = `
+            <input type="checkbox" id="anomaly-${key}" value="${key}" name="anomalies">
+            <label for="anomaly-${key}">Disk anomaly ${key}: ${ANOMALY_LIST[key]}</label>
+        `;
+        container.appendChild(div);
+    });
 }
 
-// --- API Functions (Locally Defined) ---
+function setupEvents() {
+    // File Input - Simple & Crash Proof
+    const fileInput = document.getElementById('disc-photo');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-async function createReport(reportData) {
-    // Direct Database Insert
+            // Safe Preview
+            currentFile = file;
+            const fileLabel = document.getElementById('file-label');
+            if (fileLabel) fileLabel.textContent = file.name;
+
+            const preview = document.getElementById('image-preview');
+            if (preview) {
+                const url = URL.createObjectURL(file);
+                preview.innerHTML = `<img src="${url}" style="max-height: 100px; margin-top: 10px;">`;
+                preview.classList.remove('hidden');
+            }
+        });
+    }
+
+    // Submit Handler
+    const form = document.getElementById('report-form');
+    if (form) form.addEventListener('submit', handleReportSubmit);
+
+    // Refresh Button (if exists) or Export
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) exportBtn.addEventListener('click', () => alert("Export feature pending update"));
+}
+
+// --- 4. CORE FUNCTIONS (Local & Explicit) ---
+
+async function uploadImage(file) {
+    if (!supabase) throw new Error("Supabase disconnected");
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `disc-photos/${fileName}`;
+
+    const { error } = await supabase.storage
+        .from('disc-images')
+        .upload(filePath, file);
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+        .from('disc-images')
+        .getPublicUrl(filePath);
+
+    return data.publicUrl;
+}
+
+async function createReport(dataPayload) {
+    if (!supabase) throw new Error("Supabase disconnected");
+
+    // Insert into 'report' table as requested
     const { data, error } = await supabase
-        .from('reports')
-        .insert([reportData])
+        .from('report') // Singular 'report'
+        .insert([dataPayload])
         .select()
         .single();
 
@@ -38,600 +134,111 @@ async function createReport(reportData) {
     return data;
 }
 
-async function uploadImage(file) {
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `disc-photos/${fileName}`;
-
-    // Upload
-    const { data, error } = await supabase.storage
-        .from('disc-images')
-        .upload(filePath, file);
-
-    if (error) throw error;
-
-    // Get URL
-    const { data: { publicUrl } } = supabase.storage
-        .from('disc-images')
-        .getPublicUrl(filePath);
-
-    return publicUrl;
-}
-
-async function fetchReports() {
-    const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-}
-
-async function updateReport(id, updates) {
-    const { data, error } = await supabase
-        .from('reports')
-        .update(updates)
-        .eq('id', id)
-        .select();
-    if (error) throw error;
-    return data;
-}
-
-// Global Admin Access (No Auth)
-const currentUser = {
-    username: 'public_admin',
-    name: 'Authorized User',
-    role: 'Admin'
-};
-
-// State
-let reports = [];
-let currentCompletingId = null;
-let currentReportImage = null;
-let currentReportFile = null;
-let realtimeSubscription = null;
-
-// Load data from Supabase database
-async function loadReports() {
-    try {
-        const data = await fetchReports();
-        reports = data;
-        renderWorklist();
-    } catch (error) {
-        console.error('Failed to load reports:', error);
-        // Silent fail for UX or minimal alert
-    }
-}
-
-// Initialize real-time subscriptions for auto-refresh
-function setupRealtimeSubscription() {
-    // Direct Supabase subscription
-    realtimeSubscription = supabase
-        .channel('public:reports')
-        .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'reports' },
-            (payload) => {
-                console.log('Real-time update received:', payload);
-                loadReports();
-            }
-        )
-        .subscribe((status) => {
-            console.log("Realtime subscription status:", status);
-        });
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Force Status Online Immediately (UI Fallback)
-    const welcomeMsg = document.getElementById('welcome-msg');
-    const statusIndicator = document.querySelector('.status-indicator');
-    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online";
-    if (statusIndicator) statusIndicator.classList.add('online');
-
-    // 2. Hide Login/User info related
-    const userInfo = document.getElementById('user-info');
-    if (userInfo) userInfo.style.display = 'none';
-
-    // 3. Render Abnormalities Immediately (Hardcoded List)
-    initAnomalyCheckboxes();
-
-    // 4. Setup Event Listeners
-    setupEventListeners();
-    updateClock();
-
-    // 5. Load data & Start Polling (Replace Real-time)
-    console.log("Starting Polling Mode (5s interval)");
-    await loadReports();
-    setInterval(loadReports, 5000);
-
-    // Setup Debug Tools
-    setupDebugTools();
-
-    // Log init success
-    console.log("✅ Application Initialized");
-});
-
-function setupEventListeners() {
-    setInterval(updateClock, 1000);
-
-    // File Upload - simplified handler
-    const fileInput = document.getElementById('disc-photo');
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            // Prevent any bubbling that might refresh
-            e.stopPropagation();
-            handleFileUpload(e);
-        });
-    }
-
-    // Cleanup on page unload
-    // Realtime subscription removed for stability
-
-    // Report Submission
-    const reportForm = document.getElementById('report-form');
-    if (reportForm) reportForm.addEventListener('submit', handleReportSubmit);
-
-    // Modal
-    const cancelModalBtn = document.getElementById('cancel-modal');
-    if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
-
-    const confirmCompleteBtn = document.getElementById('confirm-complete');
-    if (confirmCompleteBtn) confirmCompleteBtn.addEventListener('click', confirmCompletion);
-
-    // Export Modal
-    const exportBtn = document.getElementById('export-btn');
-    if (exportBtn) exportBtn.addEventListener('click', openExportModal);
-
-    const cancelExportBtn = document.getElementById('cancel-export');
-    if (cancelExportBtn) cancelExportBtn.addEventListener('click', closeExportModal);
-
-    const confirmExportBtn = document.getElementById('confirm-export');
-    if (confirmExportBtn) confirmExportBtn.addEventListener('click', handleExport);
-}
-
-function setupDebugTools() {
-    const debugPanel = document.getElementById('debug-panel');
-    const debugLog = document.getElementById('debug-log');
-
-    // Toggle Panel
-    document.getElementById('toggle-debug').addEventListener('click', () => {
-        debugPanel.classList.toggle('hidden');
-    });
-
-    // Check Status
-    document.getElementById('check-status').addEventListener('click', async () => {
-        debugLog.innerHTML += `<div>> Pinging database...</div>`;
-        const health = await window.emergency.checkHealth();
-        const color = health.status === 'online' ? '#4caf50' : '#ff4444';
-        debugLog.innerHTML += `<div style="color: ${color}">> Status: ${health.status} (${health.latency})</div>`;
-        debugLog.innerHTML += `<div style="color: #aaa">> ${health.message}</div>`;
-        debugLog.scrollTop = debugLog.scrollHeight;
-    });
-
-    // Force Seed
-    document.getElementById('force-seed').addEventListener('click', async () => {
-        const confirmSeed = confirm("This will attempt to create an 'admin' user with password 'admin'. Continue?");
-        if (!confirmSeed) return;
-
-        debugLog.innerHTML += `<div>> Attempting to seed admin...</div>`;
-        const result = await window.emergency.seedAdmin();
-        const color = result.success ? '#4caf50' : '#ff4444';
-        debugLog.innerHTML += `<div style="color: ${color}">> ${result.message}</div>`;
-        debugLog.scrollTop = debugLog.scrollHeight;
-    });
-}
-
-// --- Report Functions --- //
-
 async function handleReportSubmit(e) {
     e.preventDefault();
-
-    // Collect Data
-    const clinic = document.getElementById('clinic-name').value;
-    const sales = document.getElementById('sales-person').value;
-    const discType = document.getElementById('disc-type').value;
-    const lotNumber = document.getElementById('lot-number').value;
-    const expiryDate = document.getElementById('disc-expiry').value;
-    const errorDate = document.getElementById('error-date').value;
-    const reportDate = document.getElementById('report-date').value;
-
-    // Validate Disc Type (Select)
-    if (!discType) {
-        alert("Please select a Disc Type.");
-        return;
-    }
-
-    // Map checkboxes to full text descriptions
-    const selectedAnomalies = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
-        .map(cb => {
-            const code = cb.value;
-            // Use the global anomalyData object to get the text, or fallback to "Anomaly X"
-            return anomalyData[code] || `Anomaly ${code}`;
-        });
-
-    if (selectedAnomalies.length === 0) {
-        alert("Please select at least one anomaly.");
-        return;
-    }
-
-    // Show loading state
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Uploading...';
-    submitBtn.disabled = true;
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.textContent = "Sending...";
+    btn.disabled = true;
 
     try {
-        // 1. Upload image (Local Function)
-        let imageUrl = null;
-        if (currentReportFile) {
-            console.log("Uploading image...");
-            imageUrl = await uploadImage(currentReportFile);
-            console.log("Image uploaded:", imageUrl);
+        // Collect Data
+        const clinicName = document.getElementById('clinic-name').value;
+        const staffName = document.getElementById('sales-person').value; // Using existing input ID
+        const discType = document.getElementById('disc-type').value;
+        const lotNumber = document.getElementById('lot-number').value;
+        const expiryDate = document.getElementById('disc-expiry').value;
+        const errorDate = document.getElementById('error-date').value;
+        const reportDate = document.getElementById('report-date').value;
+
+        // Anomaly Collection
+        const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
+            .map(cb => ANOMALY_LIST[cb.value]);
+
+        if (!clinicName || !discType || abnormalities.length === 0) {
+            alert("Please fill in Clinic, Disc Type, and at least one Anomaly.");
+            throw new Error("Validation Failed");
         }
 
-        // 2. Prepare Data
-        const newReport = {
-            clinic: clinic,
-            sales_person: sales,
+        // Upload Image
+        let imageUrl = null;
+        if (currentFile) {
+            imageUrl = await uploadImage(currentFile);
+        }
+
+        // Payload (New Schema)
+        const payload = {
+            clinic_name: clinicName,
+            staff_name: staffName,
             disc_type: discType,
             lot_number: lotNumber,
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
-            anomalies: selectedAnomalies, // Now contains full text strings
-            status: 'Pending',
-            image_url: imageUrl
+            abnormalities: abnormalities, // Array of strings
+            image_url: imageUrl,
+            status: 'Pending'
         };
 
-        console.log("Submitting report data:", newReport);
+        await createReport(payload);
 
-        // 3. Create Report (Local Function)
-        await createReport(newReport);
-
-        // Immediate Refresh (Connect to Worklist)
-        await loadReports();
-
-        // Success!
-        // Reset form
+        // Success
+        alert("Success! Report Submitted.");
         e.target.reset();
-        const fileLabel = document.getElementById('file-label');
-        if (fileLabel) fileLabel.textContent = "Choose File...";
+        currentFile = null;
+        document.getElementById('image-preview').classList.add('hidden');
+        document.getElementById('file-label').textContent = "Choose File...";
+        loadWorklist(); // Immediate Refresh
 
-        const preview = document.getElementById('image-preview');
-        if (preview) preview.classList.add('hidden');
-
-        currentReportImage = null;
-        currentReportFile = null;
-
-        // Reset Default Date
-        document.getElementById('report-date').valueAsDate = new Date();
-        const errorDateInput = document.getElementById('error-date');
-        if (errorDateInput) errorDateInput.value = '';
-
-        const discTypeInput = document.getElementById('disc-type');
-        if (discTypeInput) discTypeInput.value = '';
-
-        alert('Success! Report Submitted.');
-    } catch (error) {
-        console.error('SERVER ERROR DETAILS:', error);
-        // Detailed Alert for debugging
-        const errorDetails = error.details || error.hint || error.message || "Unknown error";
-        alert(`Submission Failed:\n\nMessage: ${error.message}\nDetails: ${errorDetails}`);
-    } finally {
-        // Restore button state
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
-    }
-}
-
-function renderWorklist() {
-    const listContainer = document.getElementById('report-list');
-    const activeCount = document.getElementById('active-count');
-
-    listContainer.innerHTML = '';
-
-    const activeReports = reports.filter(r => r.status === 'Pending');
-    if (activeCount) activeCount.textContent = `${activeReports.length} Active`;
-
-    if (reports.length === 0) {
-        listContainer.innerHTML = '<div class="empty-state">No active reports</div>';
-        return;
-    }
-
-    reports.forEach(report => {
-        const card = document.createElement('div');
-        card.className = `report-card ${report.status === 'Completed' ? 'completed' : ''}`;
-
-        const anomaliesHtml = report.anomalies.map(a => `<span class="anomaly-tag">${a}</span>`).join('');
-
-        // GLOBAL ADMIN LOGIC: Everyone can mark as done
-        let actionButton = '';
-        if (report.status === 'Pending') {
-            actionButton = `<button class="status-btn" onclick="openCompletionModal(${report.id})">Mark as Done</button>`;
-        } else {
-            actionButton = `
-                <div style="text-align: right;">
-                    <span class="status-completed">DO: ${report.do_number || report.doNumber}</span><br>
-                    <span class="release-info">Released: ${report.release_date || report.releaseDate}</span><br>
-                    <span style="font-size: 0.75rem; color: #94a3b8;">Approved by ${report.approved_by || report.approvedBy}</span>
-                </div>`;
-        }
-
-        // Expanded Card Info (support both snake_case and camelCase for database fields)
-        const clinic = report.clinic || report.clinic_name;
-        const discType = report.disc_type || report.discType;
-        const lotNumber = report.lot_number || report.lotNumber;
-        const expiryDate = report.expiry_date || report.expiryDate;
-        const errorDate = report.error_date || report.errorDate;
-        const reportDate = report.report_date || report.reportDate;
-        const salesPerson = report.sales_person || report.sales;
-        const imageUrl = report.image_url || report.image;
-
-        card.innerHTML = `
-            <div class="report-header">
-                <div>
-                    <span class="clinic-name">${clinic}</span><br>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">${discType}</span>
-                </div>
-                <div style="text-align: right;">
-                    <span class="report-date">Reported: ${reportDate}</span><br>
-                    <span class="report-date">Error: ${errorDate}</span>
-                </div>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                Lot: ${lotNumber} | Exp: ${expiryDate}
-            </div>
-            ${imageUrl ? `<div class="report-image-thumb"><img src="${imageUrl}" alt="Defect" onclick="window.openWithImage(this.src)"></div>` : ''}
-            <div class="report-anomalies">
-                ${anomaliesHtml}
-            </div>
-            <div class="report-footer">
-                <span class="sales-name">Sales: ${salesPerson}</span>
-                ${actionButton}
-            </div>
-        `;
-        listContainer.appendChild(card);
-    });
-}
-
-
-// --- Export Functions --- //
-
-function openExportModal() {
-    if (reports.length === 0) {
-        alert("No reports to export.");
-        return;
-    }
-    const modal = document.getElementById('export-modal');
-    if (modal) modal.classList.remove('hidden');
-}
-
-function closeExportModal() {
-    const modal = document.getElementById('export-modal');
-    if (modal) modal.classList.add('hidden');
-}
-
-function handleExport() {
-    const format = document.querySelector('input[name="export-format"]:checked').value;
-    const filter = document.querySelector('input[name="export-filter"]:checked').value;
-
-    // Filter data based on selection
-    let dataToExport = reports;
-    if (filter === 'completed') {
-        dataToExport = reports.filter(r => r.status === 'Completed');
-        if (dataToExport.length === 0) {
-            alert("No completed records to export.");
-            closeExportModal();
-            return;
-        }
-    }
-
-    // Export based on format
-    if (format === 'xlsx') {
-        exportToExcel(dataToExport);
-    } else {
-        exportToCSV(dataToExport);
-    }
-
-    closeExportModal();
-}
-
-function exportToCSV(data) {
-    // CSV Header - Exact column order as specified
-    const headers = [
-        "Clinic Name",
-        "Test Item",
-        "Date of Test",
-        "Abnormality"
-    ];
-
-    // CSV Rows - Map to specified columns
-    const rows = data.map(r => [
-        `"${r.clinic}"`,                           // Column A: Clinic Name
-        `"${r.disc_type || r.discType}"`,                         // Column B: Test Item (Type of Disc)
-        r.error_date || r.errorDate,                                // Column C: Date of Test (Date of Error)
-        `"${formatAnomalies(r.anomalies)}"`        // Column D: Abnormality (multi-select)
-    ]);
-
-    // Combine
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    // Create Download Link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Disc_Reports_${new Date().toISOString().slice(0, 10)}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-function exportToExcel(data) {
-    // Prepare data with exact column order
-    const exportData = data.map(r => ({
-        "Clinic Name": r.clinic,                    // Column A
-        "Test Item": r.disc_type || r.discType,                    // Column B
-        "Date of Test": r.error_date || r.errorDate,                // Column C
-        "Abnormality": formatAnomalies(r.anomalies) // Column D
-    }));
-
-    // Create worksheet from JSON
-    const ws = XLSX.utils.json_to_sheet(exportData, {
-        header: ["Clinic Name", "Test Item", "Date of Test", "Abnormality"]
-    });
-
-    // Set column widths for better readability
-    ws['!cols'] = [
-        { wch: 25 }, // Clinic Name
-        { wch: 35 }, // Test Item
-        { wch: 15 }, // Date of Test
-        { wch: 50 }  // Abnormality
-    ];
-
-    // Create workbook and add worksheet
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Disc Reports");
-
-    // Generate Excel file and trigger download
-    XLSX.writeFile(wb, `Disc_Reports_${new Date().toISOString().slice(0, 10)}.xlsx`);
-}
-
-function formatAnomalies(anomalies) {
-    // Convert anomaly codes to readable format
-    return anomalies.map(a => {
-        const num = a.replace('Anomaly ', '');
-        if (anomalyData[num]) {
-            return `${a}: ${anomalyData[num]}`;
-        }
-        return a;
-    }).join('; ');
-}
-
-// --- Completion Helpers --- //
-
-window.openWithImage = (src) => {
-    const w = window.open("");
-    w.document.write(`<img src="${src}" style="max-width: 100%; height: auto;">`);
-};
-
-window.openCompletionModal = (id) => {
-    currentCompletingId = id;
-    document.getElementById('completion-modal').classList.remove('hidden');
-    document.getElementById('release-date').valueAsDate = new Date();
-    document.getElementById('do-number').value = ''; // Reset
-    // Reset Error State
-    const errorMsg = document.getElementById('completion-error');
-    if (errorMsg) errorMsg.classList.add('hidden');
-};
-
-function closeModal() {
-    document.getElementById('completion-modal').classList.add('hidden');
-    currentCompletingId = null;
-}
-
-async function confirmCompletion() {
-    // Check if report ID exists, admin check is implicit since everyone is admin now
-    if (!currentCompletingId) return;
-
-    const releaseDate = document.getElementById('release-date').value;
-    const doNumber = document.getElementById('do-number').value;
-    const errorMsg = document.getElementById('completion-error');
-
-    if (!releaseDate || !doNumber) {
-        if (errorMsg) errorMsg.classList.remove('hidden');
-        return;
-    }
-
-    // Hide error if valid
-    if (errorMsg) errorMsg.classList.add('hidden');
-
-    try {
-
-        // Update in database
-        await updateReport(currentCompletingId, {
-            status: 'Completed',
-            release_date: releaseDate,
-            do_number: doNumber,
-            approved_by: currentUser.username, // Uses the simulated public admin
-            approved_at: new Date().toISOString()
-        });
-
-        // Reports will auto-refresh via real-time subscription
-        closeModal();
-    } catch (error) {
-        console.error('Error completing report:', error);
-        alert('Failed to update report. Please try again.');
-    }
-}
-
-// --- Utils --- //
-
-function initAnomalyCheckboxes() {
-    const container = document.getElementById('anomaly-checkboxes');
-    if (!container) return;
-
-    container.innerHTML = ''; // Clear existing
-    Object.keys(anomalyData).forEach(key => {
-        const div = document.createElement('div');
-        div.className = 'checkbox-item';
-
-        // Custom label logic: Standard format for 1-8, Value only for 9-10
-        let labelText = `Disk anomaly ${key}: ${anomalyData[key]}`;
-        if (key === "9" || key === "10") {
-            labelText = anomalyData[key];
-        }
-
-        div.innerHTML = `
-            <input type="checkbox" id="anomaly-${key}" value="${key}" name="anomalies">
-            <label for="anomaly-${key}">${labelText}</label>
-        `;
-        container.appendChild(div);
-    });
-}
-
-function handleFileUpload(e) {
-    const file = e.target.files[0];
-
-    if (!file) return;
-
-    // Simple validation
-    if (file.size > 5000000) { // 5MB
-        alert('File is too large (Max 5MB)');
-        return;
-    }
-
-    // Save state
-    currentReportFile = file;
-
-    // Update Label
-    const fileLabel = document.getElementById('file-label');
-    if (fileLabel) fileLabel.textContent = file.name;
-
-    // Local Preview (Safe)
-    try {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const imgContainer = document.getElementById('image-preview');
-            if (imgContainer) {
-                imgContainer.innerHTML = `<img src="${event.target.result}" alt="Preview" style="max-height: 100px; display: block; margin-top: 10px;">`;
-                imgContainer.classList.remove('hidden');
-            }
-        };
-        reader.readAsDataURL(file);
     } catch (err) {
-        console.error("Preview failed:", err);
+        console.error(err);
+        if (err.message !== "Validation Failed") {
+            alert(`Error: ${err.message || err.error_description || JSON.stringify(err)}`);
+        }
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
-function updateClock() {
-    const now = new Date();
-    const clock = document.getElementById('clock');
-    if (clock) clock.textContent = now.toLocaleTimeString();
+// --- 5. WORKLIST POLLING ---
+async function loadWorklist() {
+    if (!supabase) return;
+
+    // Fetch from 'report' table
+    const { data, error } = await supabase
+        .from('report')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (!error && data) {
+        renderWorklistUI(data);
+    }
+}
+
+function renderWorklistUI(data) {
+    const list = document.getElementById('report-list');
+    if (!list) return;
+
+    if (data.length === 0) {
+        list.innerHTML = '<div class="empty-state">No reports found</div>';
+        return;
+    }
+
+    list.innerHTML = data.map(item => `
+        <div class="report-card">
+            <div class="report-header">
+                <strong>${item.clinic_name || 'Unknown Clinic'}</strong>
+                <span>${item.report_date}</span>
+            </div>
+            <div>${item.disc_type}</div>
+            <div style="font-size: 0.8em; color: gray;">
+                ${(item.abnormalities || []).join(', ')}
+            </div>
+            ${item.image_url ? `<a href="${item.image_url}" target="_blank">View Image</a>` : ''}
+            <div style="margin-top: 5px; font-weight: bold; color: ${item.status === 'Completed' ? 'green' : 'orange'}">
+                ${item.status}
+            </div>
+        </div>
+    `).join('');
 }
