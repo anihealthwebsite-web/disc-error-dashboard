@@ -1,11 +1,25 @@
 // ==========================================
-// FORCE OVERWRITE: VISUAL RESTORATION v6
+// FORCE OVERWRITE: VISUAL RESTORATION v8 (AUTH)
 // ==========================================
 
-// --- 1. CONFIG (Renamed to avoid collision) ---
-// Removing process.env checks to prevent vanilla JS crashes
-const APP_SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
-const APP_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
+// --- 1. CONFIG (Hybrid: Vercel Env + Localhost Fallback) ---
+const getEnv = (key, fallback) => {
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env[key]) {
+            return process.env[key];
+        }
+    } catch (e) { /* ignore ref errors */ }
+    return fallback;
+};
+
+const APP_SUPABASE_URL = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://izhoebtdmbfsvlmwjfah.supabase.co');
+const APP_SUPABASE_ANON_KEY = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk');
+
+// --- 2. AUTHENTICATION CONFIG ---
+const CREDENTIALS = {
+    'Admin': 'adminanihealth123',
+    'User': 'useranihealth123'
+};
 
 const ANOMALY_OPTIONS = [
     'Disk anomaly 1: Partial absence of reagent ball',
@@ -20,50 +34,109 @@ const ANOMALY_OPTIONS = [
     'Disk Error'
 ];
 
-let _supabase = null; // Renamed client
+let _supabase = null;
 let currentFile = null;
+let currentUser = null;
 
-// --- 2. INITIALIZATION ---
+// --- 3. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 App Initializing... v7-CollisionFree");
+    console.log("🚀 App Initializing... v8-Auth");
 
-    // A. Visual Restoration (Clock & Header)
-    startClock();
-    const statusEl = document.querySelector('.status-indicator');
-    const msgEl = document.getElementById('welcome-msg');
+    // A. Check Session
+    checkSession();
 
-    if (statusEl) statusEl.classList.add('online');
-    // Match the screenshot text
-    if (msgEl) msgEl.textContent = "Welcome, Primary Admin (Admin)";
+    // B. Setup Listeners
+    setupAuthListeners();
+    setupAppListeners(); // Formerly setupListeners
 
-    // B. Initialize Supabase
+    // C. Initialize Supabase (Always init for simplicity)
     try {
         if (!window.supabase) throw new Error("Supabase SDK missing");
         _supabase = window.supabase.createClient(APP_SUPABASE_URL, APP_SUPABASE_ANON_KEY);
         console.log("✅ Supabase Connected (Safe Mode)");
     } catch (err) {
         console.error("Init Error:", err);
-        // Don't alert immediately to avoid blocking UI if it's just a glitch
     }
-
-    // C. Render Inputs
-    renderCheckboxes();
-
-    // D. Setup Listeners
-    setupListeners();
-
-    // E. Data Load
-    await loadWorklist();
-    setInterval(loadWorklist, 5000); // Poll every 5s
 });
 
-// --- 3. UI RENDERING ---
+// --- 4. AUTHENTICATION LOGIC ---
+
+function checkSession() {
+    const sessionUser = localStorage.getItem('bio_user');
+    const sessionRole = localStorage.getItem('bio_role');
+
+    if (sessionUser && sessionRole) {
+        currentUser = { username: sessionUser, role: sessionRole };
+        showDashboard();
+    } else {
+        showLogin();
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('dashboard-container').classList.add('hidden');
+}
+
+function showDashboard() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('dashboard-container').classList.remove('hidden');
+
+    // Update Header
+    const msg = document.getElementById('welcome-msg');
+    if (msg) msg.textContent = `Welcome, ${currentUser.username} (${currentUser.role})`;
+
+    // Load Data & Visuals ONLY if authenticated
+    startClock();
+    renderCheckboxes();
+    loadWorklist();
+
+    // Poll updates
+    setInterval(loadWorklist, 5000);
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    const userIn = document.getElementById('username').value.trim();
+    const passIn = document.getElementById('password').value.trim();
+    const errorMsg = document.getElementById('login-error');
+
+    if (CREDENTIALS[userIn] && CREDENTIALS[userIn] === passIn) {
+        // Success
+        currentUser = { username: userIn, role: 'Admin' }; // Simple role assignment logic
+        localStorage.setItem('bio_user', userIn);
+        localStorage.setItem('bio_role', 'Admin');
+
+        errorMsg.classList.add('hidden');
+        showDashboard();
+    } else {
+        // Fail
+        errorMsg.classList.remove('hidden');
+        errorMsg.classList.add('shake');
+        setTimeout(() => errorMsg.classList.remove('shake'), 500);
+    }
+}
+
+function handleLogout() {
+    localStorage.removeItem('bio_user');
+    localStorage.removeItem('bio_role');
+    window.location.reload();
+}
+
+function setupAuthListeners() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+}
+
+// --- 5. UI RENDERING ---
 
 function startClock() {
     const update = () => {
         const clock = document.getElementById('clock');
         if (clock) {
-            // Match screenshot format: HH:MM:SS
             const now = new Date();
             clock.textContent = now.toLocaleTimeString('en-US', { hour12: false });
         }
@@ -82,7 +155,7 @@ function renderCheckboxes() {
         const id = `anomaly-${index}`;
         const div = document.createElement('div');
         div.className = 'checkbox-item';
-        div.style.marginBottom = "5px"; // Helper spacing
+        div.style.marginBottom = "5px";
 
         div.innerHTML = `
             <input type="checkbox" id="${id}" value="${fullText}" name="anomalies">
@@ -92,17 +165,13 @@ function renderCheckboxes() {
     });
 }
 
-function setupListeners() {
-    // 1. Image Upload - Robustness Fix
+function setupAppListeners() {
+    // 1. Image Upload
     const fileInput = document.getElementById('disc-photo');
     if (fileInput) {
-        // Remove old listeners
         const newHelper = fileInput.cloneNode(true);
         fileInput.parentNode.replaceChild(newHelper, fileInput);
-
-        newHelper.addEventListener('change', (e) => {
-            handleImageChange(e);
-        });
+        newHelper.addEventListener('change', handleImageChange);
     }
 
     // 2. Submit
@@ -112,7 +181,7 @@ function setupListeners() {
     }
 }
 
-// --- 4. HANDLERS ---
+// --- 6. HANDLERS ---
 
 function handleImageChange(e) {
     try {
@@ -120,16 +189,12 @@ function handleImageChange(e) {
         if (!file) return;
 
         currentFile = file;
-
-        // Label
         const label = document.getElementById('file-label');
         if (label) label.textContent = file.name;
 
-        // Preview
         const preview = document.getElementById('image-preview');
         if (preview) {
             const url = URL.createObjectURL(file);
-            // Restore visual style from memory/inference
             preview.innerHTML = `
                 <div style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden;">
                     <img src="${url}" style="width: 100%; display: block; max-height: 200px; object-fit: cover;">
@@ -149,7 +214,6 @@ async function handleFormSubmit(e) {
     btn.disabled = true;
 
     try {
-        // Collect Data
         const clinicName = document.getElementById('clinic-name').value;
         const staffName = document.getElementById('sales-person').value;
         const discType = document.getElementById('disc-type').value;
@@ -161,19 +225,16 @@ async function handleFormSubmit(e) {
         const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
             .map(cb => cb.value);
 
-        // Validation
         if (!clinicName || !discType || abnormalities.length === 0) {
             alert("Missing required fields (Clinic, Disc Type, or Anomalies).");
             throw new Error("Validation Failed");
         }
 
-        // Upload Image
         let imageUrl = null;
         if (currentFile) {
             imageUrl = await uploadImage(currentFile);
         }
 
-        // Payload
         const payload = {
             clinic_name: clinicName,
             staff_name: staffName,
@@ -182,24 +243,20 @@ async function handleFormSubmit(e) {
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
-            abnormalities: abnormalities, // Array
+            abnormalities: abnormalities,
             image_url: imageUrl,
             status: 'Pending'
         };
 
-        // Insert
         const { error } = await _supabase
-            .from('report')
+            .from('report') // Singular
             .insert([payload]);
 
         if (error) throw error;
 
-        // Success
         alert("Report Submitted Successfully!");
         e.target.reset();
         resetUI();
-
-        // Immediate Fetch
         loadWorklist();
 
     } catch (err) {
@@ -225,7 +282,7 @@ function resetUI() {
     document.getElementById('report-date').valueAsDate = new Date();
 }
 
-// --- 5. BACKEND OPS ---
+// --- 7. BACKEND OPS ---
 
 async function uploadImage(file) {
     const fileExt = file.name.split('.').pop();
@@ -274,17 +331,14 @@ function renderList(data) {
     }
 
     list.innerHTML = data.map(item => {
-        // Parse Anomalies to badges "Anomaly X"
         const anomalyBadges = (item.abnormalities || []).map(text => {
             const match = text.match(/Disk anomaly (\d+)/);
             if (match) {
                 return `<span class="anomaly-tag">Anomaly ${match[1]}</span>`;
             }
-            // Use full text if not a standard anomaly, but truncate if long?
             return `<span class="anomaly-tag">${text.replace('Disk anomaly ', '')}</span>`;
         }).join('');
 
-        // Restore Thumbnail Visuals
         const imageThumb = item.image_url
             ? `<div class="report-image-thumb" onclick="window.open('${item.image_url}', '_blank')">
                  <img src="${item.image_url}" alt="Evidence">
@@ -324,7 +378,7 @@ function renderList(data) {
     }).join('');
 }
 
-// --- 6. COMPLETION FLOW ---
+// --- 8. COMPLETION FLOW ---
 let selectedReportId = null;
 
 window.openCompletionModal = function (id) {
@@ -334,9 +388,6 @@ window.openCompletionModal = function (id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Other listeners... (ensure not duplicating)
-
-    // Completion Modal Listeners
     const cancelBtn = document.getElementById('cancel-modal');
     const confirmBtn = document.getElementById('confirm-complete');
     const modal = document.getElementById('completion-modal');
@@ -375,11 +426,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (error) throw error;
 
-                // Success
                 modal.classList.add('hidden');
                 document.getElementById('do-number').value = '';
                 document.getElementById('release-date').value = '';
-                loadWorklist(); // Refresh list
+                loadWorklist();
 
             } catch (err) {
                 console.error("Update Failed:", err);

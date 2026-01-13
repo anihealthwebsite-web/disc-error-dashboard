@@ -15,129 +15,157 @@
 <body>
     <div class="glass-background"></div>
     <div class="app-container">
-        <header>
-            <div class="logo">
-                <div class="logo-icon"></div>
-                <h1>BioChem <span class="highlight">Analyzer</span> Monitor</h1>
-            </div>
-            <div class="system-status">
-                <div class="user-info hidden" id="user-info">
-                    <span id="welcome-msg">Welcome, User</span>
-                    <button id="logout-btn" class="btn-secondary btn-small">Logout</button>
+
+        <!-- LOGIN SCREEN -->
+        <div id="login-screen" class="login-container">
+            <div class="card login-content">
+                <div class="login-header">
+                    <h2>Admin Access</h2>
+                    <p>BioChem Analyzer Monitor</p>
                 </div>
-                <span class="divider">|</span>
-                <span class="status-indicator online"></span>
-                <span>System Online</span>
-                <span class="time-display" id="clock">--:--:--</span>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" placeholder="Enter username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="Enter password" required>
+                    </div>
+                    <div class="error-msg hidden" id="login-error">Invalid Credentials</div>
+                    <button type="submit" class="btn-primary" style="margin-top: 1rem;">Secure Login</button>
+                </form>
             </div>
-        </header>
+        </div>
 
-        <main class="dashboard-grid">
-            <!-- Left Panel: Disc Error Reporting Form -->
-            <section class="card error-panel">
-                <div class="card-header">
-                    <h2>New Disc Error Report</h2>
+        <!-- MAIN DASHBOARD (Protected) -->
+        <div id="dashboard-container" class="hidden">
+            <header>
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <h1>BioChem <span class="highlight">Analyzer</span> Monitor</h1>
                 </div>
-                <div class="card-content">
-                    <form id="report-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="clinic-name">Clinic Name</label>
-                                <input type="text" id="clinic-name" placeholder="Enter clinic name" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="sales-person">Sales Person</label>
-                                <input type="text" id="sales-person" placeholder="Enter name" required>
-                            </div>
-                        </div>
+                <div class="system-status">
+                    <div class="user-info" id="user-info">
+                        <span id="welcome-msg">Welcome, User</span>
+                        <button id="logout-btn" class="btn-secondary btn-small">Logout</button>
+                    </div>
+                    <span class="divider">|</span>
+                    <span class="status-indicator online"></span>
+                    <span>System Online</span>
+                    <span class="time-display" id="clock">--:--:--</span>
+                </div>
+            </header>
 
-                        <!-- New Disc ID Fields -->
-                        <div class="form-group">
-                            <label for="disc-type">Type of Disc</label>
-                            <select id="disc-type" required>
-                                <option value="" disabled selected>Select Disc Type</option>
-                                <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
-                                <option value="Diagnosis / Health Check Panel">Diagnosis / Health Check Panel</option>
-                                <option value="Preanesthetic Evaluation Panel">Preanesthetic Evaluation Panel</option>
-                                <option value="Liver Recheck Panel">Liver Recheck Panel</option>
-                                <option value="Kidney Recheck Panel">Kidney Recheck Panel</option>
-                                <option value="Electrolyte Panel">Electrolyte Panel</option>
-                                <option value="Avian/Reptilian Panel">Avian/Reptilian Panel</option>
-                                <option value="Large Animal Panel">Large Animal Panel</option>
-                                <option value="Equine Panel">Equine Panel</option>
-                                <option value="Canine Inflammation Panel">Canine Inflammation Panel</option>
-                                <option value="Feline Inflammation Panel">Feline Inflammation Panel</option>
-                                <option value="Vetube30 Health Checking Disc">Vetube30 Health Checking Disc</option>
-                                <option value="Vetube30 Pre-anesthetic Disc">Vetube30 Pre-anesthetic Disc</option>
-                                <option value="Vetube30 Electrolyte Disc">Vetube30 Electrolyte Disc</option>
-                                <option value="Vetube30 Liver Profile Disc">Vetube30 Liver Profile Disc</option>
-                                <option value="Vetube30 Kidney Profile Disc">Vetube30 Kidney Profile Disc</option>
-                            </select>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="lot-number">Lot Number</label>
-                                <input type="text" id="lot-number" placeholder="Enter Lot #" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="disc-expiry">Disc Expiry Date</label>
-                                <input type="date" id="disc-expiry" required>
-                            </div>
-                        </div>
-
-                        <!-- Dates -->
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="error-date">Date of Error</label>
-                                <input type="date" id="error-date" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="report-date">Date Reported</label>
-                                <input type="date" id="report-date" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Anomalies Observed (Select all that apply)</label>
-                            <div class="checkbox-group" id="anomaly-checkboxes">
-                                <!-- JS will populate this -->
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Upload Photo of Disc</label>
-                            <div class="file-upload-wrapper">
-                                <div class="file-upload-ui">
-                                    <span id="file-label">Choose File...</span>
-                                    <input type="file" id="disc-photo" accept="image/*">
+            <main class="dashboard-grid">
+                <!-- Left Panel: Disc Error Reporting Form -->
+                <section class="card error-panel">
+                    <div class="card-header">
+                        <h2>New Disc Error Report</h2>
+                    </div>
+                    <div class="card-content">
+                        <form id="report-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="clinic-name">Clinic Name</label>
+                                    <input type="text" id="clinic-name" placeholder="Enter clinic name" required>
                                 </div>
-                                <div id="image-preview" class="hidden"></div>
+                                <div class="form-group">
+                                    <label for="sales-person">Sales Person</label>
+                                    <input type="text" id="sales-person" placeholder="Enter name" required>
+                                </div>
                             </div>
+
+                            <!-- New Disc ID Fields -->
+                            <div class="form-group">
+                                <label for="disc-type">Type of Disc</label>
+                                <select id="disc-type" required>
+                                    <option value="" disabled selected>Select Disc Type</option>
+                                    <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
+                                    <option value="Diagnosis / Health Check Panel">Diagnosis / Health Check Panel
+                                    </option>
+                                    <option value="Preanesthetic Evaluation Panel">Preanesthetic Evaluation Panel
+                                    </option>
+                                    <option value="Liver Recheck Panel">Liver Recheck Panel</option>
+                                    <option value="Kidney Recheck Panel">Kidney Recheck Panel</option>
+                                    <option value="Electrolyte Panel">Electrolyte Panel</option>
+                                    <option value="Avian/Reptilian Panel">Avian/Reptilian Panel</option>
+                                    <option value="Large Animal Panel">Large Animal Panel</option>
+                                    <option value="Equine Panel">Equine Panel</option>
+                                    <option value="Canine Inflammation Panel">Canine Inflammation Panel</option>
+                                    <option value="Feline Inflammation Panel">Feline Inflammation Panel</option>
+                                    <option value="Vetube30 Health Checking Disc">Vetube30 Health Checking Disc</option>
+                                    <option value="Vetube30 Pre-anesthetic Disc">Vetube30 Pre-anesthetic Disc</option>
+                                    <option value="Vetube30 Electrolyte Disc">Vetube30 Electrolyte Disc</option>
+                                    <option value="Vetube30 Liver Profile Disc">Vetube30 Liver Profile Disc</option>
+                                    <option value="Vetube30 Kidney Profile Disc">Vetube30 Kidney Profile Disc</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="lot-number">Lot Number</label>
+                                    <input type="text" id="lot-number" placeholder="Enter Lot #" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="disc-expiry">Disc Expiry Date</label>
+                                    <input type="date" id="disc-expiry" required>
+                                </div>
+                            </div>
+
+                            <!-- Dates -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="error-date">Date of Error</label>
+                                    <input type="date" id="error-date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="report-date">Date Reported</label>
+                                    <input type="date" id="report-date" required>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Anomalies Observed (Select all that apply)</label>
+                                <div class="checkbox-group" id="anomaly-checkboxes">
+                                    <!-- JS will populate this -->
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Upload Photo of Disc</label>
+                                <div class="file-upload-wrapper">
+                                    <div class="file-upload-ui">
+                                        <span id="file-label">Choose File...</span>
+                                        <input type="file" id="disc-photo" accept="image/*">
+                                    </div>
+                                    <div id="image-preview" class="hidden"></div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn-primary">Submit Report</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Right Panel: Worklist / History -->
+                <section class="card worklist-panel">
+                    <div class="card-header">
+                        <h2>Worklist</h2>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span class="badge" id="active-count">0 Active</span>
+                            <button id="export-btn" class="btn-primary btn-small">Export Data</button>
                         </div>
-
-                        <button type="submit" class="btn-primary">Submit Report</button>
-                    </form>
-                </div>
-            </section>
-
-            <!-- Right Panel: Worklist / History -->
-            <section class="card worklist-panel">
-                <div class="card-header">
-                    <h2>Worklist</h2>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <span class="badge" id="active-count">0 Active</span>
-                        <button id="export-btn" class="btn-primary btn-small">Export Data</button>
                     </div>
-                </div>
-                <div class="card-content scrollable">
-                    <div id="report-list" class="report-list">
-                        <!-- Reports populated by JS -->
-                        <div class="empty-state">No active reports</div>
+                    <div class="card-content scrollable">
+                        <div id="report-list" class="report-list">
+                            <!-- Reports populated by JS -->
+                            <div class="empty-state">No active reports</div>
+                        </div>
                     </div>
-                </div>
-            </section>
-        </main>
+                </section>
+            </main>
+        </div>
     </div>
 
     <!-- Login Modal Removed for Public Access -->
