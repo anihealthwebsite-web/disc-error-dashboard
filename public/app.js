@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // D. Setup Event Listeners
     setupEvents();
+    updateClock(); // Initial clock set
+    setInterval(updateClock, 1000); // Start clock ticker
 
     // E. Start Polling Worklist (5s)
     loadWorklist(); // Initial load
@@ -51,6 +53,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // --- 3. UI RENDERING ---
+function updateClock() {
+    const clock = document.getElementById('clock');
+    if (clock) {
+        const now = new Date();
+        clock.textContent = now.toLocaleTimeString();
+    }
+}
+
 function renderAnomalies() {
     const container = document.getElementById('anomaly-checkboxes');
     if (!container) return;
