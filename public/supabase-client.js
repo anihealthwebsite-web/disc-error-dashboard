@@ -151,6 +151,40 @@ function unsubscribeFromReports(subscription) {
 }
 
 // ========================================
+// Auth API Functions
+// ========================================
+
+/**
+ * Verify user credentials against the database
+ * @param {string} username 
+ * @param {string} password 
+ * @returns {Promise<Object>} User profile if valid, or throws error
+ */
+async function verifyUser(username, password) {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') throw new Error('User not found');
+            throw error;
+        }
+
+        if (data.password !== password) {
+            throw new Error('Incorrect password');
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Auth error:', error.message);
+        throw error;
+    }
+}
+
+// ========================================
 // Utility Functions
 // ========================================
 

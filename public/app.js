@@ -54,8 +54,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Warning: Could not connect to database. Please check your internet connection.');
     }
 
-    // Show Login Modal on Load
-    document.getElementById('login-modal').classList.remove('hidden');
+    // Load session from localStorage
+    const savedUser = localStorage.getItem('disc_user_session');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        // Bypass login modal if session exists
+        document.getElementById('login-modal').classList.add('hidden');
+        document.getElementById('user-info').classList.remove('hidden');
+        document.getElementById('welcome-msg').textContent = `Welcome, ${currentUser.name} (${currentUser.role})`;
+    } else {
+        // Show Login Modal if no session
+        document.getElementById('login-modal').classList.remove('hidden');
+    }
 
     initAnomalyCheckboxes();
     setupEventListeners();
@@ -102,14 +112,25 @@ function setupEventListeners() {
 
 // --- Auth Functions --- //
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     const userIn = document.getElementById('username').value;
     const passIn = document.getElementById('password').value;
     const errorMsg = document.getElementById('login-error');
+    const loginBtn = e.target.querySelector('button');
 
-    if (USERS[userIn] && USERS[userIn].pass === passIn) {
-        currentUser = { username: userIn, ...USERS[userIn] };
+    // Show loading state
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Verifying...';
+
+    try {
+        // Verify with centralized database
+        const userData = await verifyUser(userIn, passIn);
+
+        currentUser = userData;
+
+        // Persist session
+        localStorage.setItem('disc_user_session', JSON.stringify(currentUser));
 
         // Update UI
         document.getElementById('login-modal').classList.add('hidden');
@@ -122,13 +143,20 @@ function handleLogin(e) {
 
         // Load Data
         renderWorklist();
-    } else {
+    } catch (error) {
+        errorMsg.textContent = `Login failed: ${error.message}`;
         errorMsg.classList.remove('hidden');
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
     }
 }
 
 function handleLogout() {
     currentUser = null;
+    // Clear session
+    localStorage.removeItem('disc_user_session');
+
     document.getElementById('user-info').classList.add('hidden');
     document.getElementById('login-modal').classList.remove('hidden');
 }
