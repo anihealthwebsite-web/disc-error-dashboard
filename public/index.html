@@ -209,6 +209,80 @@
         </div>
     </div>
 
+    <!-- Edit Report Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h3>Edit Report</h3>
+            <form id="edit-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Clinic Name</label>
+                        <input type="text" id="edit-clinic" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Sales Person</label>
+                        <input type="text" id="edit-staff" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Disc Type</label>
+                    <select id="edit-disc-type" required>
+                        <option value="" disabled>Select Disc Type</option>
+                        <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
+                        <option value="Diagnosis / Health Check Panel">Diagnosis / Health Check Panel</option>
+                        <option value="Preanesthetic Evaluation Panel">Preanesthetic Evaluation Panel</option>
+                        <option value="Liver Recheck Panel">Liver Recheck Panel</option>
+                        <option value="Kidney Recheck Panel">Kidney Recheck Panel</option>
+                        <option value="Electrolyte Panel">Electrolyte Panel</option>
+                        <option value="Avian/Reptilian Panel">Avian/Reptilian Panel</option>
+                        <option value="Large Animal Panel">Large Animal Panel</option>
+                        <option value="Equine Panel">Equine Panel</option>
+                        <option value="Canine Inflammation Panel">Canine Inflammation Panel</option>
+                        <option value="Feline Inflammation Panel">Feline Inflammation Panel</option>
+                        <option value="Vetube30 Health Checking Disc">Vetube30 Health Checking Disc</option>
+                        <option value="Vetube30 Pre-anesthetic Disc">Vetube30 Pre-anesthetic Disc</option>
+                        <option value="Vetube30 Electrolyte Disc">Vetube30 Electrolyte Disc</option>
+                        <option value="Vetube30 Liver Profile Disc">Vetube30 Liver Profile Disc</option>
+                        <option value="Vetube30 Kidney Profile Disc">Vetube30 Kidney Profile Disc</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Lot Number</label>
+                        <input type="text" id="edit-lot" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="edit-expiry" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Error Date</label>
+                        <input type="date" id="edit-error-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Report Date</label>
+                        <input type="date" id="edit-report-date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Anomalies</label>
+                    <div class="checkbox-group" id="edit-anomaly-checkboxes"></div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancel-edit" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Completion Modal -->
     <div id="completion-modal" class="modal hidden">
         <div class="modal-content">

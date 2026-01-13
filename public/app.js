@@ -411,6 +411,7 @@ async function loadWorklist() {
         .order('created_at', { ascending: false });
 
     if (!error && data) {
+        allReports = data; // Cache for edit
         renderList(data);
     }
 }
@@ -468,10 +469,13 @@ function renderList(data) {
 
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
                 <span class="sales-name">${item.staff_name || ''}</span>
-                 ${item.status !== 'Completed'
+                 <div style="display:flex; gap:0.5rem;">
+                     <button class="btn-icon" title="Edit Report" onclick="openEditModal('${item.id}')">✏️</button>
+                     ${item.status !== 'Completed'
                 ? `<button class="status-btn" onclick="openCompletionModal('${item.id}')">Mark Complete</button>`
                 : `<span class="status-completed" style="font-size:0.8em; font-weight:bold;">Completed</span>`
             }
+                 </div>
             </div>
 
             ${item.status === 'Completed' ? `
@@ -484,8 +488,44 @@ function renderList(data) {
     }).join('');
 }
 
-// --- 8. COMPLETION FLOW ---
+// --- 8. COMPLETION & EDIT FLOW ---
 let selectedReportId = null;
+let currentEditId = null;
+let allReports = [];
+
+window.openEditModal = function (id) {
+    currentEditId = id;
+    const item = allReports.find(r => r.id === id);
+    if (!item) return;
+
+    // Populate Form
+    document.getElementById('edit-clinic').value = item.clinic_name;
+    document.getElementById('edit-staff').value = item.staff_name;
+    document.getElementById('edit-disc-type').value = item.disc_type;
+    document.getElementById('edit-lot').value = item.lot_number;
+    document.getElementById('edit-expiry').value = item.expiry_date;
+    document.getElementById('edit-error-date').value = item.error_date;
+    document.getElementById('edit-report-date').value = item.report_date;
+
+    // Populate Anomalies Checkboxes
+    const container = document.getElementById('edit-anomaly-checkboxes');
+    container.innerHTML = '';
+    const existingAnomalies = item.abnormalities || [];
+
+    ANOMALY_OPTIONS.forEach((fullText, index) => {
+        const checkId = `edit-anomaly-${index}`;
+        const isChecked = existingAnomalies.includes(fullText) ? 'checked' : '';
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.innerHTML = `
+            <input type="checkbox" id="${checkId}" value="${fullText}" name="edit-anomalies" ${isChecked}>
+            <label for="${checkId}" style="margin-left:8px; color:#fff;">${fullText}</label>
+        `;
+        container.appendChild(div);
+    });
+
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
 
 window.openCompletionModal = function (id) {
     selectedReportId = id;
@@ -494,6 +534,55 @@ window.openCompletionModal = function (id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Edit Modal Listeners
+    const cancelEdit = document.getElementById('cancel-edit');
+    const editForm = document.getElementById('edit-form');
+    const editModal = document.getElementById('edit-modal');
+
+    if (cancelEdit) {
+        cancelEdit.addEventListener('click', () => {
+            editModal.classList.add('hidden');
+            currentEditId = null;
+        });
+    }
+
+    if (editForm) {
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentEditId) return;
+
+            const btn = editForm.querySelector('button[type="submit"]');
+            const originalText = btn.textContent;
+            btn.textContent = "Saving...";
+            btn.disabled = true;
+
+            const payload = {
+                clinic_name: document.getElementById('edit-clinic').value,
+                staff_name: document.getElementById('edit-staff').value,
+                disc_type: document.getElementById('edit-disc-type').value,
+                lot_number: document.getElementById('edit-lot').value,
+                expiry_date: document.getElementById('edit-expiry').value,
+                error_date: document.getElementById('edit-error-date').value,
+                report_date: document.getElementById('edit-report-date').value,
+                abnormalities: Array.from(document.querySelectorAll('input[name="edit-anomalies"]:checked')).map(cb => cb.value)
+            };
+
+            try {
+                const { error } = await _supabase.from('report').update(payload).eq('id', currentEditId);
+                if (error) throw error;
+
+                editModal.classList.add('hidden');
+                loadWorklist();
+            } catch (err) {
+                alert("Edit failed: " + err.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // Completion Modal Listeners
     const cancelBtn = document.getElementById('cancel-modal');
     const confirmBtn = document.getElementById('confirm-complete');
     const modal = document.getElementById('completion-modal');
