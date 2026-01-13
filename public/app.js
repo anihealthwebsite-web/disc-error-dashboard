@@ -148,20 +148,37 @@ function setupDebugTools() {
 // --- Auth Functions --- //
 
 async function handleLogin(e) {
-    e.preventDefault();
+    if (e) e.preventDefault(); // Ensure form doesn't reload
+
     const userIn = document.getElementById('username').value;
     const passIn = document.getElementById('password').value;
     const errorMsg = document.getElementById('login-error');
-    const loginBtn = e.target.querySelector('button');
+    const loginBtn = e.target.querySelector('button[type="submit"]');
+
+    // Reset error state
+    errorMsg.classList.add('hidden');
+    errorMsg.textContent = '';
+
+    // Validate inputs
+    if (!userIn || !passIn) {
+        errorMsg.textContent = 'Please enter both username and password';
+        errorMsg.classList.remove('hidden');
+        return;
+    }
 
     // Show loading state
+    const originalBtnText = loginBtn.textContent;
     loginBtn.disabled = true;
-    loginBtn.textContent = 'Verifying...';
+    loginBtn.textContent = 'Signing in...';
+    loginBtn.classList.add('btn-loading'); // Optional styling hook
 
     try {
+        console.log('Attempting login for:', userIn);
+
         // Verify with centralized database
         const userData = await verifyUser(userIn, passIn);
 
+        console.log('Login successful:', userData.username);
         currentUser = userData;
 
         // Persist session
@@ -172,18 +189,37 @@ async function handleLogin(e) {
         document.getElementById('user-info').classList.remove('hidden');
         document.getElementById('welcome-msg').textContent = `Welcome, ${currentUser.name} (${currentUser.role})`;
 
-        // Clear Form
+        // Clear Form inputs only on success
         e.target.reset();
-        errorMsg.classList.add('hidden');
 
         // Load Data
         renderWorklist();
     } catch (error) {
-        errorMsg.textContent = `Login failed: ${error.message}`;
+        console.error('Login failed:', error);
+
+        // Show user-friendly error
+        let displayError = 'System error. Please try again.';
+        if (error.message.includes('User not found') || error.message.includes('Incorrect password')) {
+            displayError = 'Incorrect username or password.';
+        } else if (error.message.includes('Network') || error.message.includes('fetch')) {
+            displayError = 'Connection failed. Check your internet.';
+        } else {
+            displayError = error.message;
+        }
+
+        errorMsg.textContent = displayError;
         errorMsg.classList.remove('hidden');
+
+        // Shake animation for visual feedback (optional)
+        const modalContent = document.querySelector('.login-content');
+        modalContent.classList.add('shake');
+        setTimeout(() => modalContent.classList.remove('shake'), 500);
+
     } finally {
+        // Reset button state
         loginBtn.disabled = false;
-        loginBtn.textContent = 'Sign In';
+        loginBtn.textContent = originalBtnText;
+        loginBtn.classList.remove('btn-loading');
     }
 }
 
