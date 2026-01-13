@@ -169,7 +169,7 @@ async function handleLogin(e) {
     // Show loading state
     const originalBtnText = loginBtn.textContent;
     loginBtn.disabled = true;
-    loginBtn.textContent = 'Signing in...';
+    loginBtn.textContent = 'Verifying...';
     loginBtn.classList.add('btn-loading'); // Optional styling hook
 
     try {
@@ -200,9 +200,9 @@ async function handleLogin(e) {
         // Show user-friendly error
         let displayError = 'System error. Please try again.';
         if (error.message.includes('User not found') || error.message.includes('Incorrect password')) {
-            displayError = 'Incorrect username or password.';
+            displayError = 'Invalid login credentials';
         } else if (error.message.includes('Network') || error.message.includes('fetch')) {
-            displayError = 'Connection failed. Check your internet.';
+            displayError = 'Network error. Check your connection.';
         } else {
             displayError = error.message;
         }

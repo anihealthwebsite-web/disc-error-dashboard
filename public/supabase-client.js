@@ -1,7 +1,12 @@
 // Supabase Configuration and API Client
 
 const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_duMbtpyCZ3YDV2ZhHmHrEQ_xPq3qOAZ';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('❌ Missing Supabase Credentials');
+    alert('Critical Error: Supabase credentials are missing. Please check configuration.');
+}
 
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
