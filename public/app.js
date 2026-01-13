@@ -167,7 +167,12 @@ async function handleReportSubmit(e) {
         let imageUrl = null;
         if (currentReportFile) {
             console.log("Uploading image...");
-            imageUrl = await uploadImage(currentReportFile);
+            // Use window.uploadImage to ensure global access
+            if (typeof window.uploadImage === 'function') {
+                imageUrl = await window.uploadImage(currentReportFile);
+            } else {
+                console.warn("uploadImage function missing, skipping upload");
+            }
             console.log("Image uploaded:", imageUrl);
         }
 
@@ -189,7 +194,11 @@ async function handleReportSubmit(e) {
         console.log("Submitting report data:", newReport);
 
         // Save to Supabase database
-        await createReport(newReport);
+        if (typeof window.createReport === 'function') {
+            await window.createReport(newReport);
+        } else {
+            throw new Error("createReport function is missing!");
+        }
 
         // Reset form
         e.target.reset();
