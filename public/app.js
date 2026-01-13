@@ -2,10 +2,10 @@
 // FORCE OVERWRITE: VISUAL RESTORATION v6
 // ==========================================
 
-// --- 1. CONFIG (Hardcoded for Safety) ---
+// --- 1. CONFIG (Renamed to avoid collision) ---
 // Removing process.env checks to prevent vanilla JS crashes
-const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
+const APP_SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
+const APP_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
 
 const ANOMALY_OPTIONS = [
     'Disk anomaly 1: Partial absence of reagent ball',
@@ -20,12 +20,12 @@ const ANOMALY_OPTIONS = [
     'Disk Error'
 ];
 
-let supabase = null;
+let _supabase = null; // Renamed client
 let currentFile = null;
 
 // --- 2. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 App Initializing... v6-Restore");
+    console.log("🚀 App Initializing... v7-CollisionFree");
 
     // A. Visual Restoration (Clock & Header)
     startClock();
@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // B. Initialize Supabase
     try {
         if (!window.supabase) throw new Error("Supabase SDK missing");
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("✅ Supabase Connected");
+        _supabase = window.supabase.createClient(APP_SUPABASE_URL, APP_SUPABASE_ANON_KEY);
+        console.log("✅ Supabase Connected (Safe Mode)");
     } catch (err) {
         console.error("Init Error:", err);
         // Don't alert immediately to avoid blocking UI if it's just a glitch
@@ -188,7 +188,7 @@ async function handleFormSubmit(e) {
         };
 
         // Insert
-        const { error } = await supabase
+        const { error } = await _supabase
             .from('report')
             .insert([payload]);
 
@@ -232,13 +232,13 @@ async function uploadImage(file) {
     const fileName = `${Date.now()}_v6.${fileExt}`;
     const filePath = `disc-photos/${fileName}`;
 
-    const { error } = await supabase.storage
+    const { error } = await _supabase.storage
         .from('disc-images')
         .upload(filePath, file);
 
     if (error) throw error;
 
-    const { data } = supabase.storage
+    const { data } = _supabase.storage
         .from('disc-images')
         .getPublicUrl(filePath);
 
@@ -246,9 +246,9 @@ async function uploadImage(file) {
 }
 
 async function loadWorklist() {
-    if (!supabase) return;
+    if (!_supabase) return;
 
-    const { data, error } = await supabase
+    const { data, error } = await _supabase
         .from('report')
         .select('*')
         .order('created_at', { ascending: false });
@@ -314,8 +314,80 @@ function renderList(data) {
 
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
                 <span class="sales-name">${item.staff_name || ''}</span>
+                 ${item.status !== 'Completed'
+                ? `<button class="status-btn" onclick="openCompletionModal('${item.id}')">Mark Complete</button>`
+                : `<span class="status-completed" style="font-size:0.8em; font-weight:bold;">Completed</span>`
+            }
             </div>
         </div>
         `;
     }).join('');
 }
+
+// --- 6. COMPLETION FLOW ---
+let selectedReportId = null;
+
+window.openCompletionModal = function (id) {
+    selectedReportId = id;
+    const modal = document.getElementById('completion-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Other listeners... (ensure not duplicating)
+
+    // Completion Modal Listeners
+    const cancelBtn = document.getElementById('cancel-modal');
+    const confirmBtn = document.getElementById('confirm-complete');
+    const modal = document.getElementById('completion-modal');
+
+    if (cancelBtn && modal) {
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            selectedReportId = null;
+        });
+    }
+
+    if (confirmBtn && modal) {
+        confirmBtn.addEventListener('click', async () => {
+            if (!selectedReportId) return;
+
+            const doNum = document.getElementById('do-number').value;
+            const releaseDate = document.getElementById('release-date').value;
+
+            if (!doNum || !releaseDate) {
+                alert("Please enter DO Number and Release Date");
+                return;
+            }
+
+            confirmBtn.textContent = "Updating...";
+            confirmBtn.disabled = true;
+
+            try {
+                const { error } = await _supabase
+                    .from('report')
+                    .update({
+                        status: 'Completed',
+                        do_number: doNum,
+                        release_date: releaseDate
+                    })
+                    .eq('id', selectedReportId);
+
+                if (error) throw error;
+
+                // Success
+                modal.classList.add('hidden');
+                document.getElementById('do-number').value = '';
+                document.getElementById('release-date').value = '';
+                loadWorklist(); // Refresh list
+
+            } catch (err) {
+                console.error("Update Failed:", err);
+                alert("Failed to update status");
+            } finally {
+                confirmBtn.textContent = "Confirm & Archive";
+                confirmBtn.disabled = false;
+            }
+        });
+    }
+});
