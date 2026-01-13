@@ -12,15 +12,16 @@ const anomalyData = {
     "10": "Disk Error"
 };
 
-const USERS = {
-    'Admin_Primary': { pass: 'admin123', role: 'Admin', name: 'Primary Admin' },
-    'User_Standard': { pass: 'user123', role: 'Standard', name: 'Standard User' }
+// Global Admin Access (No Auth)
+const currentUser = {
+    username: 'public_admin',
+    name: 'Authorized User',
+    role: 'Admin'
 };
 
 // State
 let reports = [];
 let currentCompletingId = null;
-let currentUser = null;
 let currentReportImage = null;
 let currentReportFile = null;
 let realtimeSubscription = null;
@@ -33,7 +34,7 @@ async function loadReports() {
         renderWorklist();
     } catch (error) {
         console.error('Failed to load reports:', error);
-        alert('Failed to load reports. Please refresh the page.');
+        // Silent fail for UX or minimal alert
     }
 }
 
@@ -41,40 +42,28 @@ async function loadReports() {
 function setupRealtimeSubscription() {
     realtimeSubscription = subscribeToReports((payload) => {
         console.log('Real-time update received:', payload.eventType);
-        // Reload all reports when any change occurs
         loadReports();
     });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Test Supabase connection
-    const connected = await testConnection();
-    if (!connected) {
-        alert('Warning: Could not connect to database. Please check your internet connection.');
-    }
+    // Check Status text header
+    const welcomeMsg = document.getElementById('welcome-msg');
+    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online (Public Access)";
 
-    // Load session from localStorage
-    const savedUser = localStorage.getItem('disc_user_session');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        // Bypass login modal if session exists
-        document.getElementById('login-modal').classList.add('hidden');
-        document.getElementById('user-info').classList.remove('hidden');
-        document.getElementById('welcome-msg').textContent = `Welcome, ${currentUser.name} (${currentUser.role})`;
-    } else {
-        // Show Login Modal if no session
-        document.getElementById('login-modal').classList.remove('hidden');
-    }
+    // Hide Login/User info related (if any remains)
+    const userInfo = document.getElementById('user-info');
+    if (userInfo) userInfo.style.display = 'none';
 
     initAnomalyCheckboxes();
     setupEventListeners();
     updateClock();
 
-    // Load data from database
+    // Load data from database immediately
     await loadReports();
 
-    // Set up real-time subscriptions for auto-refresh
+    // Set up real-time subscriptions
     setupRealtimeSubscription();
 
     // Setup Debug Tools
@@ -83,12 +72,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupEventListeners() {
     setInterval(updateClock, 1000);
-
-    // Login Form
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-
-    // Logout
-    document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
     // File Upload
     document.getElementById('disc-photo').addEventListener('change', handleFileUpload);
@@ -145,131 +128,10 @@ function setupDebugTools() {
     });
 }
 
-// --- Auth Functions --- //
-
-// --- Auth Functions --- //
-
-async function handleLogin(e) {
-    // 1. Force Prevent Default - Line 1 priority
-    if (e && e.preventDefault) e.preventDefault();
-    if (e) e.stopPropagation();
-
-    // 2. Clear previous errors
-    const errorBanner = document.getElementById('auth-error-banner');
-    const errorMsg = document.getElementById('login-error');
-    if (errorBanner) errorBanner.classList.add('hidden');
-    if (errorMsg) errorMsg.classList.add('hidden');
-
-    const userIn = document.getElementById('username').value;
-    const passIn = document.getElementById('password').value;
-    const loginBtn = e.target.querySelector('button[type="submit"]');
-
-    // 3. Add Submission Logs
-    console.group('🔐 Login Attempt');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Login attempt started for:', userIn);
-    console.log('Supabase Client Status:', !!supabase);
-    // Warning: Don't log passwords in production, strictly for local debugging if needed, but avoiding here for safety.
-
-    // 4. Verify Client Config
-    if (!supabase || !Object.keys(supabase).length) {
-        console.error('CRITICAL: Supabase client is missing or empty.');
-        showAuthError('CRITICAL: Supabase Client Missing! Check Vercel Env Vars.');
-        console.groupEnd();
-        return;
-    }
-
-    // Reset visible loading state
-    const originalBtnText = loginBtn.textContent;
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Verifying...';
-    loginBtn.classList.add('btn-loading');
-
-    // 5. Catch and Display Errors
-    try {
-        if (!userIn || !passIn) {
-            throw new Error('Please enter both username and password');
-        }
-
-        // Verify with centralized database
-        console.log('Calling verifyUser...');
-        const userData = await verifyUser(userIn, passIn);
-
-        console.log('verifyUser success, User:', userData.username);
-
-        currentUser = userData;
-
-        // Persist session
-        console.log('Persisting session to localStorage...');
-        localStorage.setItem('disc_user_session', JSON.stringify(currentUser));
-
-        // Update UI
-        console.log('Updating UI for success...');
-        document.getElementById('login-modal').classList.add('hidden');
-        document.getElementById('user-info').classList.remove('hidden');
-        document.getElementById('welcome-msg').textContent = `Welcome, ${currentUser.name} (${currentUser.role})`;
-
-        // Clear Form
-        e.target.reset();
-
-        // Load Data
-        console.log('Loading Worklist...');
-        renderWorklist();
-
-    } catch (error) {
-        console.error('❌ Login Logic Failed:', error);
-
-        let displayError = 'System error. Please try again.';
-        if (error.message.includes('User not found') || error.message.includes('Incorrect password')) {
-            displayError = 'Invalid login credentials.';
-        } else if (error.message.includes('Network') || error.message.includes('fetch')) {
-            displayError = 'Network error. Database unreachable.';
-        } else {
-            displayError = error.message;
-        }
-
-        // Show in Red Banner
-        showAuthError(displayError);
-
-    } finally {
-        console.log('Login attempt finished.');
-        console.groupEnd();
-
-        // Reset button state
-        loginBtn.disabled = false;
-        loginBtn.textContent = originalBtnText;
-        loginBtn.classList.remove('btn-loading');
-    }
-}
-
-function showAuthError(message) {
-    const banner = document.getElementById('auth-error-banner');
-    if (banner) {
-        banner.textContent = message;
-        banner.classList.remove('hidden');
-        // Shake animation
-        banner.classList.add('shake');
-        setTimeout(() => banner.classList.remove('shake'), 500);
-    } else {
-        // Fallback if banner missing
-        alert(message);
-    }
-}
-
-function handleLogout() {
-    currentUser = null;
-    // Clear session
-    localStorage.removeItem('disc_user_session');
-
-    document.getElementById('user-info').classList.add('hidden');
-    document.getElementById('login-modal').classList.remove('hidden');
-}
-
 // --- Report Functions --- //
 
 async function handleReportSubmit(e) {
     e.preventDefault();
-    if (!currentUser) return;
 
     // Collect Data
     const clinic = document.getElementById('clinic-name').value;
@@ -326,15 +188,22 @@ async function handleReportSubmit(e) {
 
         // Reset form
         e.target.reset();
-        document.getElementById('file-label').textContent = "Choose File...";
-        document.getElementById('image-preview').classList.add('hidden');
+        const fileLabel = document.getElementById('file-label');
+        if (fileLabel) fileLabel.textContent = "Choose File...";
+
+        const preview = document.getElementById('image-preview');
+        if (preview) preview.classList.add('hidden');
+
         currentReportImage = null;
         currentReportFile = null;
 
         // Reset Default Date
         document.getElementById('report-date').valueAsDate = new Date();
-        document.getElementById('error-date').value = '';
-        document.getElementById('disc-type').value = '';
+        const errorDateInput = document.getElementById('error-date');
+        if (errorDateInput) errorDateInput.value = '';
+
+        const discTypeInput = document.getElementById('disc-type');
+        if (discTypeInput) discTypeInput.value = '';
 
         // Reports will auto-refresh via real-time subscription
         alert('Report submitted successfully!');
@@ -355,7 +224,7 @@ function renderWorklist() {
     listContainer.innerHTML = '';
 
     const activeReports = reports.filter(r => r.status === 'Pending');
-    activeCount.textContent = `${activeReports.length} Active`;
+    if (activeCount) activeCount.textContent = `${activeReports.length} Active`;
 
     if (reports.length === 0) {
         listContainer.innerHTML = '<div class="empty-state">No active reports</div>';
@@ -368,14 +237,10 @@ function renderWorklist() {
 
         const anomaliesHtml = report.anomalies.map(a => `<span class="anomaly-tag">${a}</span>`).join('');
 
-        // RBAC Logic for Action Button
+        // GLOBAL ADMIN LOGIC: Everyone can mark as done
         let actionButton = '';
         if (report.status === 'Pending') {
-            if (currentUser && currentUser.role === 'Admin') {
-                actionButton = `<button class="status-btn" onclick="openCompletionModal(${report.id})">Mark as Done</button>`;
-            } else {
-                actionButton = `<span class="sales-name">Status: Pending Approval</span>`;
-            }
+            actionButton = `<button class="status-btn" onclick="openCompletionModal(${report.id})">Mark as Done</button>`;
         } else {
             actionButton = `
                 <div style="text-align: right;">
@@ -430,11 +295,13 @@ function openExportModal() {
         alert("No reports to export.");
         return;
     }
-    document.getElementById('export-modal').classList.remove('hidden');
+    const modal = document.getElementById('export-modal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeExportModal() {
-    document.getElementById('export-modal').classList.add('hidden');
+    const modal = document.getElementById('export-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function handleExport() {
@@ -474,8 +341,8 @@ function exportToCSV(data) {
     // CSV Rows - Map to specified columns
     const rows = data.map(r => [
         `"${r.clinic}"`,                           // Column A: Clinic Name
-        `"${r.discType}"`,                         // Column B: Test Item (Type of Disc)
-        r.errorDate,                                // Column C: Date of Test (Date of Error)
+        `"${r.disc_type || r.discType}"`,                         // Column B: Test Item (Type of Disc)
+        r.error_date || r.errorDate,                                // Column C: Date of Test (Date of Error)
         `"${formatAnomalies(r.anomalies)}"`        // Column D: Abnormality (multi-select)
     ]);
 
@@ -501,8 +368,8 @@ function exportToExcel(data) {
     // Prepare data with exact column order
     const exportData = data.map(r => ({
         "Clinic Name": r.clinic,                    // Column A
-        "Test Item": r.discType,                    // Column B
-        "Date of Test": r.errorDate,                // Column C
+        "Test Item": r.disc_type || r.discType,                    // Column B
+        "Date of Test": r.error_date || r.errorDate,                // Column C
         "Abnormality": formatAnomalies(r.anomalies) // Column D
     }));
 
@@ -545,11 +412,6 @@ window.openWithImage = (src) => {
     w.document.write(`<img src="${src}" style="max-width: 100%; height: auto;">`);
 };
 
-window.openWithImage = (src) => {
-    const w = window.open("");
-    w.document.write(`<img src="${src}" style="max-width: 100%; height: auto;">`);
-};
-
 window.openCompletionModal = (id) => {
     currentCompletingId = id;
     document.getElementById('completion-modal').classList.remove('hidden');
@@ -566,7 +428,8 @@ function closeModal() {
 }
 
 async function confirmCompletion() {
-    if (!currentCompletingId || !currentUser || currentUser.role !== 'Admin') return;
+    // Check if report ID exists, admin check is implicit since everyone is admin now
+    if (!currentCompletingId) return;
 
     const releaseDate = document.getElementById('release-date').value;
     const doNumber = document.getElementById('do-number').value;
@@ -587,7 +450,7 @@ async function confirmCompletion() {
             status: 'Completed',
             release_date: releaseDate,
             do_number: doNumber,
-            approved_by: currentUser.username,
+            approved_by: currentUser.username, // Uses the simulated public admin
             approved_at: new Date().toISOString()
         });
 
@@ -603,6 +466,9 @@ async function confirmCompletion() {
 
 function initAnomalyCheckboxes() {
     const container = document.getElementById('anomaly-checkboxes');
+    if (!container) return;
+
+    container.innerHTML = ''; // Clear existing
     Object.keys(anomalyData).forEach(key => {
         const div = document.createElement('div');
         div.className = 'checkbox-item';
