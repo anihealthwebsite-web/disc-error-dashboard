@@ -147,79 +147,112 @@ function setupDebugTools() {
 
 // --- Auth Functions --- //
 
+// --- Auth Functions --- //
+
 async function handleLogin(e) {
-    if (e) e.preventDefault(); // Ensure form doesn't reload
+    // 1. Force Prevent Default - Line 1 priority
+    if (e && e.preventDefault) e.preventDefault();
+    if (e) e.stopPropagation();
+
+    // 2. Clear previous errors
+    const errorBanner = document.getElementById('auth-error-banner');
+    const errorMsg = document.getElementById('login-error');
+    if (errorBanner) errorBanner.classList.add('hidden');
+    if (errorMsg) errorMsg.classList.add('hidden');
 
     const userIn = document.getElementById('username').value;
     const passIn = document.getElementById('password').value;
-    const errorMsg = document.getElementById('login-error');
     const loginBtn = e.target.querySelector('button[type="submit"]');
 
-    // Reset error state
-    errorMsg.classList.add('hidden');
-    errorMsg.textContent = '';
+    // 3. Add Submission Logs
+    console.group('🔐 Login Attempt');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Login attempt started for:', userIn);
+    console.log('Supabase Client Status:', !!supabase);
+    // Warning: Don't log passwords in production, strictly for local debugging if needed, but avoiding here for safety.
 
-    // Validate inputs
-    if (!userIn || !passIn) {
-        errorMsg.textContent = 'Please enter both username and password';
-        errorMsg.classList.remove('hidden');
+    // 4. Verify Client Config
+    if (!supabase || !Object.keys(supabase).length) {
+        console.error('CRITICAL: Supabase client is missing or empty.');
+        showAuthError('CRITICAL: Supabase Client Missing! Check Vercel Env Vars.');
+        console.groupEnd();
         return;
     }
 
-    // Show loading state
+    // Reset visible loading state
     const originalBtnText = loginBtn.textContent;
     loginBtn.disabled = true;
     loginBtn.textContent = 'Verifying...';
-    loginBtn.classList.add('btn-loading'); // Optional styling hook
+    loginBtn.classList.add('btn-loading');
 
+    // 5. Catch and Display Errors
     try {
-        console.log('Attempting login for:', userIn);
+        if (!userIn || !passIn) {
+            throw new Error('Please enter both username and password');
+        }
 
         // Verify with centralized database
+        console.log('Calling verifyUser...');
         const userData = await verifyUser(userIn, passIn);
 
-        console.log('Login successful:', userData.username);
+        console.log('verifyUser success, User:', userData.username);
+
         currentUser = userData;
 
         // Persist session
+        console.log('Persisting session to localStorage...');
         localStorage.setItem('disc_user_session', JSON.stringify(currentUser));
 
         // Update UI
+        console.log('Updating UI for success...');
         document.getElementById('login-modal').classList.add('hidden');
         document.getElementById('user-info').classList.remove('hidden');
         document.getElementById('welcome-msg').textContent = `Welcome, ${currentUser.name} (${currentUser.role})`;
 
-        // Clear Form inputs only on success
+        // Clear Form
         e.target.reset();
 
         // Load Data
+        console.log('Loading Worklist...');
         renderWorklist();
-    } catch (error) {
-        console.error('Login failed:', error);
 
-        // Show user-friendly error
+    } catch (error) {
+        console.error('❌ Login Logic Failed:', error);
+
         let displayError = 'System error. Please try again.';
         if (error.message.includes('User not found') || error.message.includes('Incorrect password')) {
-            displayError = 'Invalid login credentials';
+            displayError = 'Invalid login credentials.';
         } else if (error.message.includes('Network') || error.message.includes('fetch')) {
-            displayError = 'Network error. Check your connection.';
+            displayError = 'Network error. Database unreachable.';
         } else {
             displayError = error.message;
         }
 
-        errorMsg.textContent = displayError;
-        errorMsg.classList.remove('hidden');
-
-        // Shake animation for visual feedback (optional)
-        const modalContent = document.querySelector('.login-content');
-        modalContent.classList.add('shake');
-        setTimeout(() => modalContent.classList.remove('shake'), 500);
+        // Show in Red Banner
+        showAuthError(displayError);
 
     } finally {
+        console.log('Login attempt finished.');
+        console.groupEnd();
+
         // Reset button state
         loginBtn.disabled = false;
         loginBtn.textContent = originalBtnText;
         loginBtn.classList.remove('btn-loading');
+    }
+}
+
+function showAuthError(message) {
+    const banner = document.getElementById('auth-error-banner');
+    if (banner) {
+        banner.textContent = message;
+        banner.classList.remove('hidden');
+        // Shake animation
+        banner.classList.add('shake');
+        setTimeout(() => banner.classList.remove('shake'), 500);
+    } else {
+        // Fallback if banner missing
+        alert(message);
     }
 }
 
