@@ -24,8 +24,30 @@ let currentCompletingId = null;
 let currentUser = null;
 let currentReportImage = null;
 
+// Load data from localStorage on startup
+function loadFromStorage() {
+    const savedReports = localStorage.getItem('discReports');
+    const savedCounter = localStorage.getItem('reportIdCounter');
+
+    if (savedReports) {
+        reports = JSON.parse(savedReports);
+    }
+    if (savedCounter) {
+        reportIdCounter = parseInt(savedCounter, 10);
+    }
+}
+
+// Save data to localStorage
+function saveToStorage() {
+    localStorage.setItem('discReports', JSON.stringify(reports));
+    localStorage.setItem('reportIdCounter', reportIdCounter.toString());
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Load saved data first
+    loadFromStorage();
+
     // Show Login Modal on Load
     document.getElementById('login-modal').classList.remove('hidden');
 
@@ -140,6 +162,7 @@ function handleReportSubmit(e) {
     };
 
     reports.unshift(newReport);
+    saveToStorage(); // Save to localStorage
     renderWorklist();
     e.target.reset();
     document.getElementById('file-label').textContent = "Choose File...";
@@ -382,6 +405,7 @@ function confirmCompletion() {
         report.doNumber = doNumber;
         report.approvedBy = currentUser.username;
         report.approvedAt = new Date();
+        saveToStorage(); // Save to localStorage
         renderWorklist();
     }
 
