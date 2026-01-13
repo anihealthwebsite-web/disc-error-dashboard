@@ -107,10 +107,19 @@ async function loadReports() {
 
 // Initialize real-time subscriptions for auto-refresh
 function setupRealtimeSubscription() {
-    realtimeSubscription = subscribeToReports((payload) => {
-        console.log('Real-time update received:', payload.eventType);
-        loadReports();
-    });
+    // Direct Supabase subscription
+    realtimeSubscription = supabase
+        .channel('public:reports')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'reports' },
+            (payload) => {
+                console.log('Real-time update received:', payload);
+                loadReports();
+            }
+        )
+        .subscribe((status) => {
+            console.log("Realtime subscription status:", status);
+        });
 }
 
 // Initialize
@@ -261,6 +270,9 @@ async function handleReportSubmit(e) {
 
         // 3. Create Report (Local Function)
         await createReport(newReport);
+
+        // Immediate Refresh (Connect to Worklist)
+        await loadReports();
 
         // Success!
         // Reset form
@@ -567,34 +579,43 @@ function initAnomalyCheckboxes() {
 
 function handleFileUpload(e) {
     const file = e.target.files[0];
-    if (file) {
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('Image size must be less than 5MB');
-            e.target.value = '';
-            return;
-        }
 
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
-            e.target.value = '';
-            return;
-        }
+    // Reset if no file selected (e.g. cancelled)
+    if (!file) {
+        return;
+    }
 
-        document.getElementById('file-label').textContent = file.name;
-        currentReportFile = file; // Store file object for upload
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB');
+        e.target.value = '';
+        return;
+    }
 
-        // Show preview
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.getElementById('image-preview');
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        e.target.value = '';
+        return;
+    }
+
+    // Update UI
+    const fileLabel = document.getElementById('file-label');
+    if (fileLabel) fileLabel.textContent = file.name;
+
+    currentReportFile = file; // Store file object for upload
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.getElementById('image-preview');
+        if (img) {
             img.innerHTML = `<img src="${e.target.result}" alt="Disc Preview">`;
             img.classList.remove('hidden');
-            currentReportImage = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
+        }
+        currentReportImage = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 function updateClock() {
