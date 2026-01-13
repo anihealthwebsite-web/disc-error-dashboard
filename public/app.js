@@ -179,6 +179,12 @@ function setupAppListeners() {
     if (form) {
         form.onsubmit = handleFormSubmit;
     }
+
+    // 3. Export
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', handleExport);
+    }
 }
 
 // --- 6. HANDLERS ---
@@ -264,6 +270,58 @@ async function handleFormSubmit(e) {
         if (err.message !== "Validation Failed") {
             alert("Error: " + err.message);
         }
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+async function handleExport() {
+    const btn = document.getElementById('export-btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Exporting...";
+    btn.disabled = true;
+
+    try {
+        const { data, error } = await _supabase
+            .from('report')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        // Format Data
+        const rows = data.map(item => ({
+            "Clinic Name": item.clinic_name,
+            "Staff": item.staff_name,
+            "Disc Type": item.disc_type,
+            "Lot Number": item.lot_number,
+            "Expiry Date": item.expiry_date,
+            "Error Date": item.error_date,
+            "Date Reported": item.report_date,
+            "Abnormalities": (item.abnormalities || []).join(", "),
+            "Image URL": item.image_url,
+            "Status": item.status
+        }));
+
+        // Generate Filename: BioChem_Reports_YYYY-MM-DD.csv
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `BioChem_Reports_${dateStr}.csv`;
+
+        // Create Workbook & Download
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Reports");
+        XLSX.writeFile(wb, filename);
+
+    } catch (err) {
+        console.error("Export Failed:", err);
+        alert("Failed to export data: " + err.message);
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
