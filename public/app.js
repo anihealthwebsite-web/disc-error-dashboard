@@ -12,6 +12,73 @@ const anomalyData = {
     "10": "Disk Error"
 };
 
+// --- Supabase Config & Init (Moved here for reliability) ---
+const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
+
+let supabase;
+if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+    console.error('Supabase Library not loaded! Check index.html');
+    alert('Critical Error: Supabase library not loaded. Please refresh.');
+}
+
+// --- API Functions (Locally Defined) ---
+
+async function createReport(reportData) {
+    // Direct Database Insert
+    const { data, error } = await supabase
+        .from('reports')
+        .insert([reportData])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+async function uploadImage(file) {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `disc-photos/${fileName}`;
+
+    // Upload
+    const { data, error } = await supabase.storage
+        .from('disc-images')
+        .upload(filePath, file);
+
+    if (error) throw error;
+
+    // Get URL
+    const { data: { publicUrl } } = supabase.storage
+        .from('disc-images')
+        .getPublicUrl(filePath);
+
+    return publicUrl;
+}
+
+async function fetchReports() {
+    const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+}
+
+async function updateReport(id, updates) {
+    const { data, error } = await supabase
+        .from('reports')
+        .update(updates)
+        .eq('id', id)
+        .select();
+    if (error) throw error;
+    return data;
+}
+
 // Global Admin Access (No Auth)
 const currentUser = {
     username: 'public_admin',
@@ -163,43 +230,35 @@ async function handleReportSubmit(e) {
     submitBtn.disabled = true;
 
     try {
-        // Upload image to Supabase Storage if one was selected
+        // 1. Upload image (Local Function)
         let imageUrl = null;
         if (currentReportFile) {
             console.log("Uploading image...");
-            // Use window.uploadImage to ensure global access
-            if (typeof window.uploadImage === 'function') {
-                imageUrl = await window.uploadImage(currentReportFile);
-            } else {
-                console.warn("uploadImage function missing, skipping upload");
-            }
+            imageUrl = await uploadImage(currentReportFile);
             console.log("Image uploaded:", imageUrl);
         }
 
-        // Create report object for database
+        // 2. Prepare Data
         // Ensure keys MATCH Supabase column names EXACTLY
         const newReport = {
             clinic: clinic,
             sales_person: sales,
-            disc_type: discType, // Column: disc_type
+            disc_type: discType,
             lot_number: lotNumber,
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
             anomalies: selectedAnomalies,
             status: 'Pending',
-            image_url: imageUrl // Can be null, DB should allow nullable text
+            image_url: imageUrl
         };
 
         console.log("Submitting report data:", newReport);
 
-        // Save to Supabase database
-        if (typeof window.createReport === 'function') {
-            await window.createReport(newReport);
-        } else {
-            throw new Error("createReport function is missing!");
-        }
+        // 3. Create Report (Local Function)
+        await createReport(newReport);
 
+        // Success!
         // Reset form
         e.target.reset();
         const fileLabel = document.getElementById('file-label');
@@ -219,7 +278,7 @@ async function handleReportSubmit(e) {
         const discTypeInput = document.getElementById('disc-type');
         if (discTypeInput) discTypeInput.value = '';
 
-        alert('Report submitted successfully!');
+        alert('Success! Report Submitted.');
     } catch (error) {
         console.error('SERVER ERROR DETAILS:', error);
         // Detailed Alert for debugging
