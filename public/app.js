@@ -426,11 +426,16 @@ function renderList(data) {
 
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
                 <span class="sales-name">${item.staff_name || ''}</span>
-                 ${item.status !== 'Completed'
-                ? `<button class="status-btn" onclick="openCompletionModal('${item.id}')">Mark Complete</button>`
-                : `<span class="status-completed" style="font-size:0.8em; font-weight:bold;">Completed</span>`
+                ? `< button class="status-btn" onclick = "openCompletionModal('${item.id}')" > Mark Complete</button > `
+                : `< span class="status-completed" style = "font-size:0.8em; font-weight:bold;" > Completed</span > `
             }
             </div>
+
+            ${item.status === 'Completed' ? `
+            <div class="completion-info">
+                <div><strong>DO #:</strong> ${item.do_number || 'N/A'}</div>
+                <div><strong>Released:</strong> ${item.release_date ? new Date(item.release_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</div>
+            </div>` : ''}
         </div>
         `;
     }).join('');

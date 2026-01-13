@@ -472,6 +472,19 @@ input[type="file"] {
     font-size: 0.85rem;
 }
 
+/* New Completion Info Section */
+.completion-info {
+    margin-top: 0.75rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+}
+
 /* Modal */
 .modal {
     position: fixed;
