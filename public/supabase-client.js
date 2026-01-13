@@ -154,15 +154,11 @@ function unsubscribeFromReports(subscription) {
 // Utility Functions
 // ========================================
 
-/**
- * Test database connection
- * @returns {Promise<boolean>} True if connected successfully
- */
 async function testConnection() {
     try {
         const { data, error } = await supabase
             .from('reports')
-            .select('count')
+            .select('id')
             .limit(1);
 
         if (error) throw error;
