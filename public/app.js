@@ -53,8 +53,10 @@ function setupEventListeners() {
     document.getElementById('cancel-modal').addEventListener('click', closeModal);
     document.getElementById('confirm-complete').addEventListener('click', confirmCompletion);
 
-    // Export
-    document.getElementById('export-btn').addEventListener('click', exportToCSV);
+    // Export Modal
+    document.getElementById('export-btn').addEventListener('click', openExportModal);
+    document.getElementById('cancel-export').addEventListener('click', closeExportModal);
+    document.getElementById('confirm-export').addEventListener('click', handleExport);
 }
 
 // --- Auth Functions --- //
@@ -215,37 +217,61 @@ function renderWorklist() {
     });
 }
 
-    });
-}
 
-function exportToCSV() {
+// --- Export Functions --- //
+
+function openExportModal() {
     if (reports.length === 0) {
         alert("No reports to export.");
         return;
     }
+    document.getElementById('export-modal').classList.remove('hidden');
+}
 
-    // CSV Header
+function closeExportModal() {
+    document.getElementById('export-modal').classList.add('hidden');
+}
+
+function handleExport() {
+    const format = document.querySelector('input[name="export-format"]:checked').value;
+    const filter = document.querySelector('input[name="export-filter"]:checked').value;
+
+    // Filter data based on selection
+    let dataToExport = reports;
+    if (filter === 'completed') {
+        dataToExport = reports.filter(r => r.status === 'Completed');
+        if (dataToExport.length === 0) {
+            alert("No completed records to export.");
+            closeExportModal();
+            return;
+        }
+    }
+
+    // Export based on format
+    if (format === 'xlsx') {
+        exportToExcel(dataToExport);
+    } else {
+        exportToCSV(dataToExport);
+    }
+
+    closeExportModal();
+}
+
+function exportToCSV(data) {
+    // CSV Header - Exact column order as specified
     const headers = [
-        "ID", "Status", "Clinic", "Sales Person", "Disc Type",
-        "Lot Number", "Expiry Date", "Date of Error", "Date Reported",
-        "Anomalies", "DO Number", "Release Date", "Approved By"
+        "Clinic Name",
+        "Test Item",
+        "Date of Test",
+        "Abnormality"
     ];
 
-    // CSV Rows
-    const rows = reports.map(r => [
-        r.id,
-        r.status,
-        `"${r.clinic}"`, // Quote strings to handle commas
-        `"${r.sales}"`,
-        `"${r.discType}"`,
-        `"${r.lotNumber}"`,
-        r.expiryDate,
-        r.errorDate,
-        r.reportDate,
-        `"${r.anomalies.join(', ')}"`,
-        r.doNumber || '',
-        r.releaseDate || '',
-        r.approvedBy || ''
+    // CSV Rows - Map to specified columns
+    const rows = data.map(r => [
+        `"${r.clinic}"`,                           // Column A: Clinic Name
+        `"${r.discType}"`,                         // Column B: Test Item (Type of Disc)
+        r.errorDate,                                // Column C: Date of Test (Date of Error)
+        `"${formatAnomalies(r.anomalies)}"`        // Column D: Abnormality (multi-select)
     ]);
 
     // Combine
@@ -264,6 +290,47 @@ function exportToCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+function exportToExcel(data) {
+    // Prepare data with exact column order
+    const exportData = data.map(r => ({
+        "Clinic Name": r.clinic,                    // Column A
+        "Test Item": r.discType,                    // Column B
+        "Date of Test": r.errorDate,                // Column C
+        "Abnormality": formatAnomalies(r.anomalies) // Column D
+    }));
+
+    // Create worksheet from JSON
+    const ws = XLSX.utils.json_to_sheet(exportData, {
+        header: ["Clinic Name", "Test Item", "Date of Test", "Abnormality"]
+    });
+
+    // Set column widths for better readability
+    ws['!cols'] = [
+        { wch: 25 }, // Clinic Name
+        { wch: 35 }, // Test Item
+        { wch: 15 }, // Date of Test
+        { wch: 50 }  // Abnormality
+    ];
+
+    // Create workbook and add worksheet
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Disc Reports");
+
+    // Generate Excel file and trigger download
+    XLSX.writeFile(wb, `Disc_Reports_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function formatAnomalies(anomalies) {
+    // Convert anomaly codes to readable format
+    return anomalies.map(a => {
+        const num = a.replace('Anomaly ', '');
+        if (anomalyData[num]) {
+            return `${a}: ${anomalyData[num]}`;
+        }
+        return a;
+    }).join('; ');
 }
 
 // --- Completion Helpers --- //
