@@ -287,3 +287,15 @@ async function testConnection() {
         return false;
     }
 }
+
+// ========================================
+// Expose API to Window (Fix Scope Issues)
+// ========================================
+window.fetchReports = fetchReports;
+window.createReport = createReport;
+window.updateReport = updateReport;
+window.uploadImage = uploadImage;
+window.subscribeToReports = subscribeToReports;
+window.unsubscribeFromReports = unsubscribeFromReports;
+window.verifyUser = verifyUser;
+window.testConnection = testConnection;
