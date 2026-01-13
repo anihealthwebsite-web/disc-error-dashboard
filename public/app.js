@@ -19,34 +19,40 @@ const USERS = {
 
 // State
 let reports = [];
-let reportIdCounter = 1;
 let currentCompletingId = null;
 let currentUser = null;
 let currentReportImage = null;
+let currentReportFile = null;
+let realtimeSubscription = null;
 
-// Load data from localStorage on startup
-function loadFromStorage() {
-    const savedReports = localStorage.getItem('discReports');
-    const savedCounter = localStorage.getItem('reportIdCounter');
-
-    if (savedReports) {
-        reports = JSON.parse(savedReports);
-    }
-    if (savedCounter) {
-        reportIdCounter = parseInt(savedCounter, 10);
+// Load data from Supabase database
+async function loadReports() {
+    try {
+        const data = await fetchReports();
+        reports = data;
+        renderWorklist();
+    } catch (error) {
+        console.error('Failed to load reports:', error);
+        alert('Failed to load reports. Please refresh the page.');
     }
 }
 
-// Save data to localStorage
-function saveToStorage() {
-    localStorage.setItem('discReports', JSON.stringify(reports));
-    localStorage.setItem('reportIdCounter', reportIdCounter.toString());
+// Initialize real-time subscriptions for auto-refresh
+function setupRealtimeSubscription() {
+    realtimeSubscription = subscribeToReports((payload) => {
+        console.log('Real-time update received:', payload.eventType);
+        // Reload all reports when any change occurs
+        loadReports();
+    });
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    // Load saved data first
-    loadFromStorage();
+document.addEventListener('DOMContentLoaded', async () => {
+    // Test Supabase connection
+    const connected = await testConnection();
+    if (!connected) {
+        alert('Warning: Could not connect to database. Please check your internet connection.');
+    }
 
     // Show Login Modal on Load
     document.getElementById('login-modal').classList.remove('hidden');
@@ -54,6 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initAnomalyCheckboxes();
     setupEventListeners();
     updateClock();
+
+    // Load data from database
+    await loadReports();
+
+    // Set up real-time subscriptions for auto-refresh
+    setupRealtimeSubscription();
 });
 
 function setupEventListeners() {
@@ -67,6 +79,13 @@ function setupEventListeners() {
 
     // File Upload
     document.getElementById('disc-photo').addEventListener('change', handleFileUpload);
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (realtimeSubscription) {
+            unsubscribeFromReports(realtimeSubscription);
+        }
+    });
 
     // Report Submission
     document.getElementById('report-form').addEventListener('submit', handleReportSubmit);
@@ -116,7 +135,7 @@ function handleLogout() {
 
 // --- Report Functions --- //
 
-function handleReportSubmit(e) {
+async function handleReportSubmit(e) {
     e.preventDefault();
     if (!currentUser) return;
 
@@ -143,36 +162,58 @@ function handleReportSubmit(e) {
         return;
     }
 
-    const newReport = {
-        id: reportIdCounter++,
-        clinic,
-        sales,
-        discType,
-        lotNumber,
-        expiryDate,
-        errorDate,
-        reportDate,
-        anomalies: selectedAnomalies,
-        status: 'Pending',
-        doNumber: null,
-        releaseDate: null,
-        approvedBy: null,
-        approvedAt: null,
-        image: currentReportImage
-    };
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Uploading...';
+    submitBtn.disabled = true;
 
-    reports.unshift(newReport);
-    saveToStorage(); // Save to localStorage
-    renderWorklist();
-    e.target.reset();
-    document.getElementById('file-label').textContent = "Choose File...";
-    document.getElementById('image-preview').classList.add('hidden');
-    currentReportImage = null;
+    try {
+        // Upload image to Supabase Storage if one was selected
+        let imageUrl = null;
+        if (currentReportFile) {
+            imageUrl = await uploadImage(currentReportFile);
+        }
 
-    // Reset Default Date
-    document.getElementById('report-date').valueAsDate = new Date();
-    document.getElementById('error-date').value = '';
-    document.getElementById('disc-type').value = '';
+        // Create report object for database
+        const newReport = {
+            clinic: clinic,
+            sales_person: sales,
+            disc_type: discType,
+            lot_number: lotNumber,
+            expiry_date: expiryDate,
+            error_date: errorDate,
+            report_date: reportDate,
+            anomalies: selectedAnomalies,
+            status: 'Pending',
+            image_url: imageUrl
+        };
+
+        // Save to Supabase database
+        await createReport(newReport);
+
+        // Reset form
+        e.target.reset();
+        document.getElementById('file-label').textContent = "Choose File...";
+        document.getElementById('image-preview').classList.add('hidden');
+        currentReportImage = null;
+        currentReportFile = null;
+
+        // Reset Default Date
+        document.getElementById('report-date').valueAsDate = new Date();
+        document.getElementById('error-date').value = '';
+        document.getElementById('disc-type').value = '';
+
+        // Reports will auto-refresh via real-time subscription
+        alert('Report submitted successfully!');
+    } catch (error) {
+        console.error('Error submitting report:', error);
+        alert('Failed to submit report. Please try again.');
+    } finally {
+        // Restore button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
 }
 
 function renderWorklist() {
@@ -206,33 +247,42 @@ function renderWorklist() {
         } else {
             actionButton = `
                 <div style="text-align: right;">
-                    <span class="status-completed">DO: ${report.doNumber}</span><br>
-                    <span class="release-info">Released: ${report.releaseDate}</span><br>
-                    <span style="font-size: 0.75rem; color: #94a3b8;">Approved by ${report.approvedBy}</span>
+                    <span class="status-completed">DO: ${report.do_number || report.doNumber}</span><br>
+                    <span class="release-info">Released: ${report.release_date || report.releaseDate}</span><br>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">Approved by ${report.approved_by || report.approvedBy}</span>
                 </div>`;
         }
 
-        // Expanded Card Info
+        // Expanded Card Info (support both snake_case and camelCase for database fields)
+        const clinic = report.clinic || report.clinic_name;
+        const discType = report.disc_type || report.discType;
+        const lotNumber = report.lot_number || report.lotNumber;
+        const expiryDate = report.expiry_date || report.expiryDate;
+        const errorDate = report.error_date || report.errorDate;
+        const reportDate = report.report_date || report.reportDate;
+        const salesPerson = report.sales_person || report.sales;
+        const imageUrl = report.image_url || report.image;
+
         card.innerHTML = `
             <div class="report-header">
                 <div>
-                    <span class="clinic-name">${report.clinic}</span><br>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">${report.discType}</span>
+                    <span class="clinic-name">${clinic}</span><br>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">${discType}</span>
                 </div>
                 <div style="text-align: right;">
-                    <span class="report-date">Reported: ${report.reportDate}</span><br>
-                    <span class="report-date">Error: ${report.errorDate}</span>
+                    <span class="report-date">Reported: ${reportDate}</span><br>
+                    <span class="report-date">Error: ${errorDate}</span>
                 </div>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                Lot: ${report.lotNumber} | Exp: ${report.expiryDate}
+                Lot: ${lotNumber} | Exp: ${expiryDate}
             </div>
-            ${report.image ? `<div class="report-image-thumb"><img src="${report.image}" alt="Defect" onclick="window.openWithImage(this.src)"></div>` : ''}
+            ${imageUrl ? `<div class="report-image-thumb"><img src="${imageUrl}" alt="Defect" onclick="window.openWithImage(this.src)"></div>` : ''}
             <div class="report-anomalies">
                 ${anomaliesHtml}
             </div>
             <div class="report-footer">
-                <span class="sales-name">Sales: ${report.sales}</span>
+                <span class="sales-name">Sales: ${salesPerson}</span>
                 ${actionButton}
             </div>
         `;
@@ -383,7 +433,7 @@ function closeModal() {
     currentCompletingId = null;
 }
 
-function confirmCompletion() {
+async function confirmCompletion() {
     if (!currentCompletingId || !currentUser || currentUser.role !== 'Admin') return;
 
     const releaseDate = document.getElementById('release-date').value;
@@ -398,18 +448,23 @@ function confirmCompletion() {
     // Hide error if valid
     if (errorMsg) errorMsg.classList.add('hidden');
 
-    const report = reports.find(r => r.id === currentCompletingId);
-    if (report) {
-        report.status = 'Completed';
-        report.releaseDate = releaseDate;
-        report.doNumber = doNumber;
-        report.approvedBy = currentUser.username;
-        report.approvedAt = new Date();
-        saveToStorage(); // Save to localStorage
-        renderWorklist();
-    }
+    try {
 
-    closeModal();
+        // Update in database
+        await updateReport(currentCompletingId, {
+            status: 'Completed',
+            release_date: releaseDate,
+            do_number: doNumber,
+            approved_by: currentUser.username,
+            approved_at: new Date().toISOString()
+        });
+
+        // Reports will auto-refresh via real-time subscription
+        closeModal();
+    } catch (error) {
+        console.error('Error completing report:', error);
+        alert('Failed to update report. Please try again.');
+    }
 }
 
 // --- Utils --- //
@@ -437,7 +492,24 @@ function initAnomalyCheckboxes() {
 function handleFileUpload(e) {
     const file = e.target.files[0];
     if (file) {
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image size must be less than 5MB');
+            e.target.value = '';
+            return;
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            e.target.value = '';
+            return;
+        }
+
         document.getElementById('file-label').textContent = file.name;
+        currentReportFile = file; // Store file object for upload
+
+        // Show preview
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = document.getElementById('image-preview');
