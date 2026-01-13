@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Set up real-time subscriptions for auto-refresh
     setupRealtimeSubscription();
+
+    // Setup Debug Tools
+    setupDebugTools();
 });
 
 function setupEventListeners() {
@@ -108,6 +111,38 @@ function setupEventListeners() {
     document.getElementById('export-btn').addEventListener('click', openExportModal);
     document.getElementById('cancel-export').addEventListener('click', closeExportModal);
     document.getElementById('confirm-export').addEventListener('click', handleExport);
+}
+
+function setupDebugTools() {
+    const debugPanel = document.getElementById('debug-panel');
+    const debugLog = document.getElementById('debug-log');
+
+    // Toggle Panel
+    document.getElementById('toggle-debug').addEventListener('click', () => {
+        debugPanel.classList.toggle('hidden');
+    });
+
+    // Check Status
+    document.getElementById('check-status').addEventListener('click', async () => {
+        debugLog.innerHTML += `<div>> Pinging database...</div>`;
+        const health = await window.emergency.checkHealth();
+        const color = health.status === 'online' ? '#4caf50' : '#ff4444';
+        debugLog.innerHTML += `<div style="color: ${color}">> Status: ${health.status} (${health.latency})</div>`;
+        debugLog.innerHTML += `<div style="color: #aaa">> ${health.message}</div>`;
+        debugLog.scrollTop = debugLog.scrollHeight;
+    });
+
+    // Force Seed
+    document.getElementById('force-seed').addEventListener('click', async () => {
+        const confirmSeed = confirm("This will attempt to create an 'admin' user with password 'admin'. Continue?");
+        if (!confirmSeed) return;
+
+        debugLog.innerHTML += `<div>> Attempting to seed admin...</div>`;
+        const result = await window.emergency.seedAdmin();
+        const color = result.success ? '#4caf50' : '#ff4444';
+        debugLog.innerHTML += `<div style="color: ${color}">> ${result.message}</div>`;
+        debugLog.scrollTop = debugLog.scrollHeight;
+    });
 }
 
 // --- Auth Functions --- //

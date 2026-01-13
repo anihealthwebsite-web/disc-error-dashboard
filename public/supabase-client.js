@@ -185,6 +185,85 @@ async function verifyUser(username, password) {
 }
 
 // ========================================
+// Emergency & Debug Functions
+// ========================================
+
+/**
+ * Force create an admin user if one doesn't exist (Emergency Seeding)
+ */
+async function seedAdmin() {
+    console.log('Attempting to seed admin...');
+    try {
+        // Check if admin exists
+        const { data: existingUser } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('username', 'admin')
+            .single();
+
+        if (existingUser) {
+            console.log('✅ Admin user already exists');
+            return { success: true, message: 'Admin already exists' };
+        }
+
+        // Create admin
+        const { data, error } = await supabase
+            .from('profiles')
+            .insert([{
+                username: 'admin',
+                password: 'admin',
+                role: 'Admin',
+                name: 'Emergency Admin'
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        console.log('✅ Admin user created successfully');
+        return { success: true, message: 'Admin created: admin / admin' };
+    } catch (error) {
+        console.error('❌ Seeding failed:', error);
+        return { success: false, message: error.message };
+    }
+}
+
+/**
+ * Check database health and connectivity
+ */
+async function checkHealth() {
+    try {
+        const start = Date.now();
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('count')
+            .limit(1);
+
+        const latency = Date.now() - start;
+
+        if (error) throw error;
+
+        return {
+            status: 'online',
+            latency: `${latency}ms`,
+            message: 'Database connected'
+        };
+    } catch (error) {
+        return {
+            status: 'offline',
+            latency: 0,
+            message: error.message
+        };
+    }
+}
+
+// Make emergency functions globally available
+window.emergency = {
+    seedAdmin,
+    checkHealth
+};
+
+// ========================================
 // Utility Functions
 // ========================================
 
