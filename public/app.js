@@ -1,14 +1,30 @@
 // ==========================================
 // FORCE OVERWRITE: FINAL PRODUCTION LOGIC
-// Version: Production-v4-FlatList
+// Version: Production-v5-Polyfill
 // ==========================================
 
 // --- 1. CONFIG & DATA ---
-// Hardcoded for guaranteed connection (Vanilla JS compatible)
-const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
+// Hybrid approach: Tries process.env (as requested) but falls back to hardcoded strings
+// This prevents "undefined" crashes in vanilla JS environments
+const getEnv = (key, fallback) => {
+    try {
+        // Check if process.env exists (Bundled env)
+        if (typeof process !== 'undefined' && process.env && process.env[key]) {
+            return process.env[key];
+        }
+        // Check if injected into window (Custom env)
+        if (window.env && window.env[key]) {
+            return window.env[key];
+        }
+    } catch (e) {
+        // Ignore reference errors
+    }
+    return fallback;
+};
 
-// EXACT REQUESTED FLAT LIST
+const SUPABASE_URL = getEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://izhoebtdmbfsvlmwjfah.supabase.co');
+const SUPABASE_ANON_KEY = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk');
+
 const ANOMALY_OPTIONS = [
     'Disk anomaly 1: Partial absence of reagent ball',
     'Disk anomaly 2: Diluent not enough',
@@ -27,7 +43,7 @@ let currentFile = null;
 
 // --- 2. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 App Initializing... v4-Force");
+    console.log("🚀 App Initializing... v5-EnvSupport");
 
     // A. Force Online Status
     const statusEl = document.querySelector('.status-indicator');
@@ -40,12 +56,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         if (!window.supabase) throw new Error("Supabase SDK missing");
 
-        // Direct init with hardcoded keys
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log("✅ Supabase Connected");
     } catch (err) {
         console.error("Init Error:", err);
-        alert("Database connection failed. Please refresh.");
+        alert("Database connection failed. Check console.");
         return;
     }
 
@@ -56,9 +71,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // D. Setup Listeners
     setupListeners();
 
-    // E. Initial Load
+    // E. Initial Load & Polling
     await loadWorklist();
-    // Start Polling (5s)
     setInterval(loadWorklist, 5000);
 });
 
@@ -76,7 +90,6 @@ function renderCheckboxes() {
         div.className = 'checkbox-item';
         div.style.marginBottom = "5px";
 
-        // Value is the full text string as requested
         div.innerHTML = `
             <input type="checkbox" id="${id}" value="${fullText}" name="anomalies">
             <label for="${id}" style="margin-left: 8px;">${fullText}</label>
@@ -95,20 +108,26 @@ function startClock() {
 }
 
 function setupListeners() {
-    // Image Upload
+    // 1. Image Upload
     const fileInput = document.getElementById('disc-photo');
     if (fileInput) {
-        // Clone to clear listeners
         const newHelper = fileInput.cloneNode(true);
         fileInput.parentNode.replaceChild(newHelper, fileInput);
 
         newHelper.addEventListener('change', handleImageChange);
     }
 
-    // Submit
+    // 2. Submit
     const form = document.getElementById('report-form');
     if (form) {
         form.onsubmit = handleFormSubmit;
+    }
+
+    // 3. Export (Placeholder)
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) {
+        // Re-attach if needed or leave simplified
+        exportBtn.onclick = () => alert("Exporting not available in this version");
     }
 }
 
@@ -121,7 +140,7 @@ function handleImageChange(e) {
 
         currentFile = file;
 
-        // UI Updates
+        // Label Update
         const label = document.getElementById('file-label');
         if (label) label.textContent = file.name;
 
@@ -134,7 +153,6 @@ function handleImageChange(e) {
         }
     } catch (err) {
         console.error("Preview Error:", err);
-        alert("Error loading image preview");
     }
 }
 
@@ -146,7 +164,7 @@ async function handleFormSubmit(e) {
     btn.disabled = true;
 
     try {
-        // 1. Gather Data & Validation
+        // Data Extraction
         const clinicName = document.getElementById('clinic-name').value;
         const staffName = document.getElementById('sales-person').value;
         const discType = document.getElementById('disc-type').value;
@@ -156,20 +174,20 @@ async function handleFormSubmit(e) {
         const reportDate = document.getElementById('report-date').value;
 
         const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
-            .map(cb => cb.value); // Full text string
+            .map(cb => cb.value);
 
         if (!clinicName || !discType || abnormalities.length === 0) {
-            alert("Please fill in Clinic, Disc Type, and select Anomalies.");
+            alert("Please complete required fields: Clinic, Disc Type, Anomalies.");
             throw new Error("Validation Failed");
         }
 
-        // 2. Upload Image
+        // Image Upload
         let imageUrl = null;
         if (currentFile) {
             imageUrl = await uploadImage(currentFile);
         }
 
-        // 3. Payload (Exact Schema from Prompt)
+        // DB Payload (Report Table)
         const payload = {
             clinic_name: clinicName,
             staff_name: staffName,
@@ -178,19 +196,18 @@ async function handleFormSubmit(e) {
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
-            abnormalities: abnormalities, // Array
+            abnormalities: abnormalities,
             image_url: imageUrl,
             status: 'Pending'
         };
 
-        // 4. Insert
         const { error } = await supabase
             .from('report')
             .insert([payload]);
 
         if (error) throw error;
 
-        // 5. Success
+        // Success
         alert("Success! Report Submitted.");
         e.target.reset();
         resetUI();
@@ -199,7 +216,7 @@ async function handleFormSubmit(e) {
     } catch (err) {
         console.error("Submit Error:", err);
         if (err.message !== "Validation Failed") {
-            alert("Submission Failed: " + (err.message || "Unknown Error"));
+            alert("Submission Failed: " + (err.message || "Unknown error"));
         }
     } finally {
         btn.textContent = originalText;
@@ -223,7 +240,7 @@ function resetUI() {
 
 async function uploadImage(file) {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_force.${fileExt}`;
+    const fileName = `${Date.now()}_v5.${fileExt}`;
     const filePath = `disc-photos/${fileName}`;
 
     const { error } = await supabase.storage
@@ -274,7 +291,7 @@ function renderList(data) {
                 <span>${item.report_date}</span>
             </div>
             <div>${item.disc_type}</div>
-            <div style="font-size: 0.8em; color: #666; margin: 4px 0;">
+            <div style="font-size: 0.8em; color: gray; margin: 4px 0;">
                 ${(item.abnormalities || []).join(', ')}
             </div>
             ${item.image_url ? `<a href="${item.image_url}" target="_blank">View Image</a>` : ''}
