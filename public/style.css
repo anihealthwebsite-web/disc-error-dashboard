@@ -20,7 +20,8 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-primary);
     min-height: 100vh;
-    overflow: hidden;
+    overflow-y: auto;
+    /* Allow scrolling */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -33,7 +34,9 @@ body {
 .app-container {
     width: 95%;
     max-width: 1400px;
-    height: 90vh;
+    min-height: 90vh;
+    /* Allow growth */
+    height: auto;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -128,8 +131,9 @@ header {
     /* 50/50 split for form and list */
     gap: 1.5rem;
     flex: 1;
-    overflow: hidden;
-    /* Contain scroll */
+    overflow: visible;
+    /* Allow content to push */
+    height: auto;
 }
 
 /* Cards */
@@ -141,15 +145,17 @@ header {
     padding: 2rem;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
+    /* Allow growth */
+    height: auto;
     position: relative;
 }
 
 .card-content {
     flex: 1;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-    /* Space for scrollbar */
+    overflow: visible;
+    /* Allow growth */
+    padding-right: 0;
 }
 
 /* Scrollbar Styling */
