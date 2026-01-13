@@ -215,8 +215,13 @@ async function handleReportSubmit(e) {
         return;
     }
 
+    // Map checkboxes to full text descriptions
     const selectedAnomalies = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
-        .map(cb => `Anomaly ${cb.value}`);
+        .map(cb => {
+            const code = cb.value;
+            // Use the global anomalyData object to get the text, or fallback to "Anomaly X"
+            return anomalyData[code] || `Anomaly ${code}`;
+        });
 
     if (selectedAnomalies.length === 0) {
         alert("Please select at least one anomaly.");
@@ -239,7 +244,6 @@ async function handleReportSubmit(e) {
         }
 
         // 2. Prepare Data
-        // Ensure keys MATCH Supabase column names EXACTLY
         const newReport = {
             clinic: clinic,
             sales_person: sales,
@@ -248,7 +252,7 @@ async function handleReportSubmit(e) {
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
-            anomalies: selectedAnomalies,
+            anomalies: selectedAnomalies, // Now contains full text strings
             status: 'Pending',
             image_url: imageUrl
         };
