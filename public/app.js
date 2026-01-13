@@ -61,71 +61,113 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // --- 4. AUTHENTICATION LOGIC ---
 
-function checkSession() {
-    const sessionUser = localStorage.getItem('bio_user');
-    const sessionRole = localStorage.getItem('bio_role');
+// --- 4. AUTHENTICATION LOGIC ---
 
-    if (sessionUser && sessionRole) {
-        currentUser = { username: sessionUser, role: sessionRole };
-        showDashboard();
-    } else {
+function checkSession() {
+    try {
+        const sessionUser = localStorage.getItem('bio_user');
+        const sessionRole = localStorage.getItem('bio_role');
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+
+        // Check legacy or new keys
+        if (sessionUser && (sessionRole || isLoggedIn)) {
+            currentUser = { username: sessionUser, role: sessionRole || 'User' };
+            showDashboard();
+        } else {
+            showLogin();
+        }
+    } catch (e) {
+        console.error("Session check failed", e);
         showLogin();
     }
 }
 
 function showLogin() {
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('dashboard-container').classList.add('hidden');
+    const loginScreen = document.getElementById('login-screen');
+    const dashboard = document.getElementById('dashboard-container');
+
+    if (loginScreen) {
+        loginScreen.style.display = 'flex'; // Ensure flex for centering
+        loginScreen.classList.remove('hidden');
+    }
+    if (dashboard) {
+        dashboard.style.display = 'none';
+        dashboard.classList.add('hidden');
+    }
 }
 
 function showDashboard() {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('dashboard-container').classList.remove('hidden');
+    const loginScreen = document.getElementById('login-screen');
+    const dashboard = document.getElementById('dashboard-container');
+
+    if (loginScreen) {
+        loginScreen.style.display = 'none';
+        loginScreen.classList.add('hidden');
+    }
+    if (dashboard) {
+        dashboard.style.display = 'block'; // Ensure block
+        dashboard.classList.remove('hidden');
+    }
 
     // Update Header
     const msg = document.getElementById('welcome-msg');
-    if (msg) msg.textContent = `Welcome, ${currentUser.username} (${currentUser.role})`;
+    if (msg && currentUser) msg.textContent = `Welcome, ${currentUser.username} (${currentUser.role})`;
 
-    // Load Data & Visuals ONLY if authenticated
+    // Load Data
     startClock();
     renderCheckboxes();
     loadWorklist();
-
-    // Poll updates
-    setInterval(loadWorklist, 5000);
 }
 
 function handleLogin(e) {
-    e.preventDefault();
+    if (e) e.preventDefault(); // Just in case
+
     const userIn = document.getElementById('username').value.trim();
     const passIn = document.getElementById('password').value.trim();
     const errorMsg = document.getElementById('login-error');
 
-    if (CREDENTIALS[userIn] && CREDENTIALS[userIn] === passIn) {
-        // Success
-        currentUser = { username: userIn, role: 'Admin' }; // Simple role assignment logic
-        localStorage.setItem('bio_user', userIn);
-        localStorage.setItem('bio_role', 'Admin');
+    console.log("Attempting Login:", userIn);
 
-        errorMsg.classList.add('hidden');
+    if (CREDENTIALS[userIn] && CREDENTIALS[userIn] === passIn) {
+        console.log("Credentials match");
+        // Success
+        currentUser = { username: userIn, role: userIn === 'Admin' ? 'Admin' : 'User' };
+
+        localStorage.setItem('bio_user', userIn);
+        localStorage.setItem('bio_role', currentUser.role);
+        localStorage.setItem('isLoggedIn', 'true');
+
+        if (errorMsg) errorMsg.classList.add('hidden');
         showDashboard();
     } else {
-        // Fail
-        errorMsg.classList.remove('hidden');
-        errorMsg.classList.add('shake');
-        setTimeout(() => errorMsg.classList.remove('shake'), 500);
+        console.warn("Credentials mismatch");
+        if (errorMsg) {
+            errorMsg.classList.remove('hidden');
+            errorMsg.classList.add('shake');
+            setTimeout(() => errorMsg.classList.remove('shake'), 500);
+        }
     }
 }
 
 function handleLogout() {
-    localStorage.removeItem('bio_user');
-    localStorage.removeItem('bio_role');
+    localStorage.clear(); // Wipe everything
     window.location.reload();
 }
 
 function setupAuthListeners() {
+    // Changed to Button Click to prevent form reload issues
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+    }
+
+    // Keep Enter key support
     const loginForm = document.getElementById('login-form');
-    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (loginForm) {
+        loginForm.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin(e);
+        });
+    }
 
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
