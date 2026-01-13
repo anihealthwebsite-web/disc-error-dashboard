@@ -166,22 +166,27 @@ async function handleReportSubmit(e) {
         // Upload image to Supabase Storage if one was selected
         let imageUrl = null;
         if (currentReportFile) {
+            console.log("Uploading image...");
             imageUrl = await uploadImage(currentReportFile);
+            console.log("Image uploaded:", imageUrl);
         }
 
         // Create report object for database
+        // Ensure keys MATCH Supabase column names EXACTLY
         const newReport = {
             clinic: clinic,
             sales_person: sales,
-            disc_type: discType,
+            disc_type: discType, // Column: disc_type
             lot_number: lotNumber,
             expiry_date: expiryDate,
             error_date: errorDate,
             report_date: reportDate,
             anomalies: selectedAnomalies,
             status: 'Pending',
-            image_url: imageUrl
+            image_url: imageUrl // Can be null, DB should allow nullable text
         };
+
+        console.log("Submitting report data:", newReport);
 
         // Save to Supabase database
         await createReport(newReport);
@@ -205,11 +210,12 @@ async function handleReportSubmit(e) {
         const discTypeInput = document.getElementById('disc-type');
         if (discTypeInput) discTypeInput.value = '';
 
-        // Reports will auto-refresh via real-time subscription
         alert('Report submitted successfully!');
     } catch (error) {
-        console.error('Error submitting report:', error);
-        alert('Failed to submit report. Please try again.');
+        console.error('SERVER ERROR DETAILS:', error);
+        // Detailed Alert for debugging
+        const errorDetails = error.details || error.hint || error.message || "Unknown error";
+        alert(`Submission Failed:\n\nMessage: ${error.message}\nDetails: ${errorDetails}`);
     } finally {
         // Restore button state
         submitBtn.textContent = originalText;
