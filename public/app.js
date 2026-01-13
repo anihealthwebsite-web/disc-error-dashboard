@@ -1,83 +1,85 @@
 // ==========================================
-// EMERGENCY OVERWRITE: ROBUST APP LOGIC
-// Version: Production-Critical-v3
+// FORCE OVERWRITE: FINAL PRODUCTION LOGIC
+// Version: Production-v4-FlatList
 // ==========================================
 
-// --- 1. HARDCODED CONFIG & DATA ---
-// Fallback keys ensuring connectivity even if Env Vars fail
+// --- 1. CONFIG & DATA ---
+// Hardcoded for guaranteed connection (Vanilla JS compatible)
 const SUPABASE_URL = 'https://izhoebtdmbfsvlmwjfah.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6aG9lYnRkbWJmc3ZsbXdqZmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNjgxMTYsImV4cCI6MjA4Mzg0NDExNn0.uFfE_0fQQrmx7JoF4fky6K50BJSrV7PocdOVo5k1rNk';
 
+// EXACT REQUESTED FLAT LIST
 const ANOMALY_OPTIONS = [
-    "Partial absence of reagent ball",
-    "Diluent not enough",
-    "Lyophilization reagent deterioration",
-    "Diluent deterioration failure",
-    "Abnormal liquid distribution",
-    "Reagent colorimetric hole unfilled",
-    "Sample/diluent mixing failure",
-    "Abnormal resolubility of reagent ball",
-    "Insufficient Sample",
-    "Disk Error"
+    'Disk anomaly 1: Partial absence of reagent ball',
+    'Disk anomaly 2: Diluent not enough',
+    'Disk anomaly 3: Lyophilization reagent deterioration',
+    'Disk anomaly 4: Diluent deterioration failure',
+    'Disk anomaly 5: Abnormal liquid distribution',
+    'Disk anomaly 6: Reagent colorimetric hole unfilled',
+    'Disk anomaly 7: Sample/diluent mixing failure',
+    'Disk anomaly 8: Abnormal resolubility of reagent ball',
+    'Insufficient Sample',
+    'Disk Error'
 ];
 
-// Global State
 let supabase = null;
 let currentFile = null;
 
-// --- 2. INITIALIZATION (Immediate & Robust) ---
+// --- 2. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 App Initializing... v3");
+    console.log("🚀 App Initializing... v4-Force");
 
-    // A. status UI Force
-    const welcomeMsg = document.getElementById('welcome-msg');
-    const statusIndicator = document.querySelector('.status-indicator');
-    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online (Ready)";
-    if (statusIndicator) statusIndicator.classList.add('online');
+    // A. Force Online Status
+    const statusEl = document.querySelector('.status-indicator');
+    const msgEl = document.getElementById('welcome-msg');
+
+    if (statusEl) statusEl.classList.add('online');
+    if (msgEl) msgEl.textContent = "System Status: Online (Ready)";
 
     // B. Initialize Supabase
     try {
-        if (!window.supabase) {
-            throw new Error("Supabase Library not loaded! Check index.html");
-        }
+        if (!window.supabase) throw new Error("Supabase SDK missing");
 
-        // Use hardcoded keys for guaranteed access in this vanilla setup
+        // Direct init with hardcoded keys
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("✅ Supabase Client Ready");
+        console.log("✅ Supabase Connected");
     } catch (err) {
-        console.error("Supabase Init Error:", err);
-        alert('Critical Error: Supabase library not loaded. Please refresh.');
+        console.error("Init Error:", err);
+        alert("Database connection failed. Please refresh.");
         return;
     }
 
-    // C. Render Lists Immediately
-    renderAnomalies();
+    // C. Render UI
+    renderCheckboxes();
     startClock();
 
-    // D. Setup Event Listeners
-    setupEvents();
+    // D. Setup Listeners
+    setupListeners();
 
-    // E. Start Polling Worklist (5s)
-    loadWorklist(); // Initial load
+    // E. Initial Load
+    await loadWorklist();
+    // Start Polling (5s)
     setInterval(loadWorklist, 5000);
 });
 
 // --- 3. UI RENDERING ---
-function renderAnomalies() {
+
+function renderCheckboxes() {
     const container = document.getElementById('anomaly-checkboxes');
     if (!container) return;
 
     container.innerHTML = '';
-    ANOMALY_OPTIONS.forEach((text, index) => {
-        const id = index + 1;
-        let labelText = id <= 8 ? `Disk anomaly ${id}: ${text}` : text;
 
+    ANOMALY_OPTIONS.forEach((fullText, index) => {
+        const id = `anomaly-${index}`;
         const div = document.createElement('div');
         div.className = 'checkbox-item';
         div.style.marginBottom = "5px";
+
+        // Value is the full text string as requested
         div.innerHTML = `
-            <input type="checkbox" id="anomaly-${id}" value="${labelText}" name="anomalies">
-            <label for="anomaly-${id}" style="margin-left: 8px;">${labelText}</label>
+            <input type="checkbox" id="${id}" value="${fullText}" name="anomalies">
+            <label for="${id}" style="margin-left: 8px;">${fullText}</label>
         `;
         container.appendChild(div);
     });
@@ -92,50 +94,136 @@ function startClock() {
     setInterval(update, 1000);
 }
 
-function setupEvents() {
-    // File Input - Simple & Crash Proof
+function setupListeners() {
+    // Image Upload
     const fileInput = document.getElementById('disc-photo');
     if (fileInput) {
-        // Clone to clear old listeners
+        // Clone to clear listeners
         const newHelper = fileInput.cloneNode(true);
         fileInput.parentNode.replaceChild(newHelper, fileInput);
 
-        newHelper.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Safe Preview using Blob URL
-            currentFile = file;
-            const fileLabel = document.getElementById('file-label');
-            if (fileLabel) fileLabel.textContent = file.name;
-
-            const preview = document.getElementById('image-preview');
-            if (preview) {
-                const url = URL.createObjectURL(file);
-                preview.innerHTML = `<img src="${url}" style="max-height: 100px; margin-top: 10px; border-radius: 4px;">`;
-                preview.classList.remove('hidden');
-            }
-        });
+        newHelper.addEventListener('change', handleImageChange);
     }
 
-    // Submit Handler
+    // Submit
     const form = document.getElementById('report-form');
     if (form) {
-        form.onsubmit = (e) => handleReportSubmit(e); // Override default
+        form.onsubmit = handleFormSubmit;
     }
-
-    // Refresh Button (if exists) or Export
-    const exportBtn = document.getElementById('export-btn');
-    if (exportBtn) exportBtn.addEventListener('click', () => alert("Export feature pending update"));
 }
 
-// --- 4. CORE FUNCTIONS (Local & Explicit) ---
+// --- 4. HANDLERS ---
+
+function handleImageChange(e) {
+    try {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        currentFile = file;
+
+        // UI Updates
+        const label = document.getElementById('file-label');
+        if (label) label.textContent = file.name;
+
+        // Instant Preview
+        const preview = document.getElementById('image-preview');
+        if (preview) {
+            const url = URL.createObjectURL(file);
+            preview.innerHTML = `<img src="${url}" style="max-height: 150px; border-radius: 8px; margin-top: 10px;">`;
+            preview.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error("Preview Error:", err);
+        alert("Error loading image preview");
+    }
+}
+
+async function handleFormSubmit(e) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.textContent = "Sending...";
+    btn.disabled = true;
+
+    try {
+        // 1. Gather Data & Validation
+        const clinicName = document.getElementById('clinic-name').value;
+        const staffName = document.getElementById('sales-person').value;
+        const discType = document.getElementById('disc-type').value;
+        const lotNumber = document.getElementById('lot-number').value;
+        const expiryDate = document.getElementById('disc-expiry').value;
+        const errorDate = document.getElementById('error-date').value;
+        const reportDate = document.getElementById('report-date').value;
+
+        const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
+            .map(cb => cb.value); // Full text string
+
+        if (!clinicName || !discType || abnormalities.length === 0) {
+            alert("Please fill in Clinic, Disc Type, and select Anomalies.");
+            throw new Error("Validation Failed");
+        }
+
+        // 2. Upload Image
+        let imageUrl = null;
+        if (currentFile) {
+            imageUrl = await uploadImage(currentFile);
+        }
+
+        // 3. Payload (Exact Schema from Prompt)
+        const payload = {
+            clinic_name: clinicName,
+            staff_name: staffName,
+            disc_type: discType,
+            lot_number: lotNumber,
+            expiry_date: expiryDate,
+            error_date: errorDate,
+            report_date: reportDate,
+            abnormalities: abnormalities, // Array
+            image_url: imageUrl,
+            status: 'Pending'
+        };
+
+        // 4. Insert
+        const { error } = await supabase
+            .from('report')
+            .insert([payload]);
+
+        if (error) throw error;
+
+        // 5. Success
+        alert("Success! Report Submitted.");
+        e.target.reset();
+        resetUI();
+        loadWorklist();
+
+    } catch (err) {
+        console.error("Submit Error:", err);
+        if (err.message !== "Validation Failed") {
+            alert("Submission Failed: " + (err.message || "Unknown Error"));
+        }
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function resetUI() {
+    currentFile = null;
+    const label = document.getElementById('file-label');
+    if (label) label.textContent = "Choose File...";
+    const preview = document.getElementById('image-preview');
+    if (preview) {
+        preview.innerHTML = '';
+        preview.classList.add('hidden');
+    }
+    document.getElementById('report-date').valueAsDate = new Date();
+}
+
+// --- 5. HOSTED LOGIC ---
 
 async function uploadImage(file) {
-    if (!supabase) throw new Error("Supabase disconnected");
-
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const fileName = `${Date.now()}_force.${fileExt}`;
     const filePath = `disc-photos/${fileName}`;
 
     const { error } = await supabase.storage
@@ -151,112 +239,20 @@ async function uploadImage(file) {
     return data.publicUrl;
 }
 
-async function createReport(dataPayload) {
-    if (!supabase) throw new Error("Supabase disconnected");
-
-    // Insert into 'report' table as requested
-    const { data, error } = await supabase
-        .from('report') // Singular 'report'
-        .insert([dataPayload])
-        .select()
-        .single();
-
-    if (error) throw error;
-    return data;
-}
-
-async function handleReportSubmit(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.textContent;
-    btn.textContent = "Sending...";
-    btn.disabled = true;
-
-    try {
-        // Collect Data
-        const clinicName = document.getElementById('clinic-name').value;
-        const staffName = document.getElementById('sales-person').value; // Using existing input ID
-        const discType = document.getElementById('disc-type').value;
-        const lotNumber = document.getElementById('lot-number').value;
-        const expiryDate = document.getElementById('disc-expiry').value;
-        const errorDate = document.getElementById('error-date').value;
-        const reportDate = document.getElementById('report-date').value;
-
-        // Anomaly Collection
-        const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
-            .map(cb => cb.value); // Already contains full text from checkbox value
-
-        if (!clinicName || !discType || abnormalities.length === 0) {
-            alert("Please fill in Clinic, Disc Type, and at least one Anomaly.");
-            throw new Error("Validation Failed");
-        }
-
-        // Upload Image
-        let imageUrl = null;
-        if (currentFile) {
-            imageUrl = await uploadImage(currentFile);
-        }
-
-        // Payload (New Schema)
-        const payload = {
-            clinic_name: clinicName,
-            staff_name: staffName,
-            disc_type: discType,
-            lot_number: lotNumber,
-            expiry_date: expiryDate,
-            error_date: errorDate,
-            report_date: reportDate,
-            abnormalities: abnormalities, // Array of strings
-            image_url: imageUrl,
-            status: 'Pending'
-        };
-
-        await createReport(payload);
-
-        // Success
-        alert("Success! Report Submitted.");
-        e.target.reset();
-        currentFile = null;
-        const preview = document.getElementById('image-preview');
-        if (preview) {
-            preview.innerHTML = '';
-            preview.classList.add('hidden');
-        }
-        document.getElementById('file-label').textContent = "Choose File...";
-        // Reset Date
-        document.getElementById('report-date').valueAsDate = new Date();
-
-        loadWorklist(); // Immediate Refresh
-
-    } catch (err) {
-        console.error(err);
-        if (err.message !== "Validation Failed") {
-            alert(`Error: ${err.message || JSON.stringify(err)}`);
-        }
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
-}
-
-// --- 5. WORKLIST POLLING ---
 async function loadWorklist() {
     if (!supabase) return;
 
-    // Fetch from 'report' table
     const { data, error } = await supabase
         .from('report')
         .select('*')
         .order('created_at', { ascending: false });
 
     if (!error && data) {
-        renderWorklistUI(data);
-    } else if (error) {
-        console.error("Worklist Load Error:", error);
+        renderList(data);
     }
 }
 
-function renderWorklistUI(data) {
+function renderList(data) {
     const list = document.getElementById('report-list');
     const badge = document.getElementById('active-count');
     if (!list) return;
@@ -274,15 +270,15 @@ function renderWorklistUI(data) {
     list.innerHTML = data.map(item => `
         <div class="report-card">
             <div class="report-header">
-                <strong>${item.clinic_name || 'Unknown Clinic'}</strong>
+                <strong>${item.clinic_name || 'Clinic'}</strong>
                 <span>${item.report_date}</span>
             </div>
             <div>${item.disc_type}</div>
-            <div style="font-size: 0.8em; color: gray;">
+            <div style="font-size: 0.8em; color: #666; margin: 4px 0;">
                 ${(item.abnormalities || []).join(', ')}
             </div>
             ${item.image_url ? `<a href="${item.image_url}" target="_blank">View Image</a>` : ''}
-            <div style="margin-top: 5px; font-weight: bold; color: ${item.status === 'Completed' ? 'green' : 'orange'}">
+            <div style="margin-top: 5px; color: ${item.status === 'Completed' ? 'green' : 'orange'}">
                 ${item.status}
             </div>
         </div>
