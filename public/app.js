@@ -124,52 +124,71 @@ function setupRealtimeSubscription() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check Status text header
+    // 1. Force Status Online Immediately (UI Fallback)
     const welcomeMsg = document.getElementById('welcome-msg');
-    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online (Public Access)";
+    const statusIndicator = document.querySelector('.status-indicator');
+    if (welcomeMsg) welcomeMsg.textContent = "System Status: Online";
+    if (statusIndicator) statusIndicator.classList.add('online');
 
-    // Hide Login/User info related (if any remains)
+    // 2. Hide Login/User info related
     const userInfo = document.getElementById('user-info');
     if (userInfo) userInfo.style.display = 'none';
 
+    // 3. Render Abnormalities Immediately (Hardcoded List)
     initAnomalyCheckboxes();
+
+    // 4. Setup Event Listeners
     setupEventListeners();
     updateClock();
 
-    // Load data from database immediately
+    // 5. Load data & Start Polling (Replace Real-time)
+    console.log("Starting Polling Mode (5s interval)");
     await loadReports();
-
-    // Set up real-time subscriptions
-    setupRealtimeSubscription();
+    setInterval(loadReports, 5000);
 
     // Setup Debug Tools
     setupDebugTools();
+
+    // Log init success
+    console.log("✅ Application Initialized");
 });
 
 function setupEventListeners() {
     setInterval(updateClock, 1000);
 
-    // File Upload
-    document.getElementById('disc-photo').addEventListener('change', handleFileUpload);
+    // File Upload - simplified handler
+    const fileInput = document.getElementById('disc-photo');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            // Prevent any bubbling that might refresh
+            e.stopPropagation();
+            handleFileUpload(e);
+        });
+    }
 
     // Cleanup on page unload
-    window.addEventListener('beforeunload', () => {
-        if (realtimeSubscription) {
-            unsubscribeFromReports(realtimeSubscription);
-        }
-    });
+    // Realtime subscription removed for stability
 
     // Report Submission
-    document.getElementById('report-form').addEventListener('submit', handleReportSubmit);
+    const reportForm = document.getElementById('report-form');
+    if (reportForm) reportForm.addEventListener('submit', handleReportSubmit);
 
     // Modal
-    document.getElementById('cancel-modal').addEventListener('click', closeModal);
-    document.getElementById('confirm-complete').addEventListener('click', confirmCompletion);
+    const cancelModalBtn = document.getElementById('cancel-modal');
+    if (cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
+
+    const confirmCompleteBtn = document.getElementById('confirm-complete');
+    if (confirmCompleteBtn) confirmCompleteBtn.addEventListener('click', confirmCompletion);
 
     // Export Modal
-    document.getElementById('export-btn').addEventListener('click', openExportModal);
-    document.getElementById('cancel-export').addEventListener('click', closeExportModal);
-    document.getElementById('confirm-export').addEventListener('click', handleExport);
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) exportBtn.addEventListener('click', openExportModal);
+
+    const cancelExportBtn = document.getElementById('cancel-export');
+    if (cancelExportBtn) cancelExportBtn.addEventListener('click', closeExportModal);
+
+    const confirmExportBtn = document.getElementById('confirm-export');
+    if (confirmExportBtn) confirmExportBtn.addEventListener('click', handleExport);
 }
 
 function setupDebugTools() {
@@ -580,42 +599,35 @@ function initAnomalyCheckboxes() {
 function handleFileUpload(e) {
     const file = e.target.files[0];
 
-    // Reset if no file selected (e.g. cancelled)
-    if (!file) {
+    if (!file) return;
+
+    // Simple validation
+    if (file.size > 5000000) { // 5MB
+        alert('File is too large (Max 5MB)');
         return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Image size must be less than 5MB');
-        e.target.value = '';
-        return;
-    }
+    // Save state
+    currentReportFile = file;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        e.target.value = '';
-        return;
-    }
-
-    // Update UI
+    // Update Label
     const fileLabel = document.getElementById('file-label');
     if (fileLabel) fileLabel.textContent = file.name;
 
-    currentReportFile = file; // Store file object for upload
-
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = document.getElementById('image-preview');
-        if (img) {
-            img.innerHTML = `<img src="${e.target.result}" alt="Disc Preview">`;
-            img.classList.remove('hidden');
-        }
-        currentReportImage = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    // Local Preview (Safe)
+    try {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const imgContainer = document.getElementById('image-preview');
+            if (imgContainer) {
+                imgContainer.innerHTML = `<img src="${event.target.result}" alt="Preview" style="max-height: 100px; display: block; margin-top: 10px;">`;
+                imgContainer.classList.remove('hidden');
+            }
+        };
+        reader.readAsDataURL(file);
+    } catch (err) {
+        console.error("Preview failed:", err);
+    }
 }
 
 function updateClock() {
