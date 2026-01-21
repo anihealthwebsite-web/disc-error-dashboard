@@ -470,7 +470,9 @@ function renderList(data) {
             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
                 <span class="sales-name">${item.staff_name || ''}</span>
                  <div style="display:flex; gap:0.5rem;">
-                     <button class="btn-icon" title="Edit Report" onclick="openEditModal('${item.id}')">✏️</button>
+                     ${currentUser && currentUser.role === 'Admin'
+                ? `<button class="btn-icon" title="Edit Report" onclick="handleEdit('${item.id}')">✏️</button>`
+                : ''}
                      ${item.status !== 'Completed'
                 ? `<button class="status-btn" onclick="openCompletionModal('${item.id}')">Mark Complete</button>`
                 : `<span class="status-completed" style="font-size:0.8em; font-weight:bold;">Completed</span>`
@@ -490,41 +492,81 @@ function renderList(data) {
 
 // --- 8. COMPLETION & EDIT FLOW ---
 let selectedReportId = null;
-let currentEditId = null;
+let editingReport = null;
 let allReports = [];
 
-window.openEditModal = function (id) {
-    currentEditId = id;
+// Expose to window for inline onclick (backup) or external calls
+window.handleEdit = function (id) {
+    console.log("Edit requested for ID:", id);
     const item = allReports.find(r => r.id === id);
-    if (!item) return;
 
-    // Populate Form
-    document.getElementById('edit-clinic').value = item.clinic_name;
-    document.getElementById('edit-staff').value = item.staff_name;
-    document.getElementById('edit-disc-type').value = item.disc_type;
-    document.getElementById('edit-lot').value = item.lot_number;
-    document.getElementById('edit-expiry').value = item.expiry_date;
-    document.getElementById('edit-error-date').value = item.error_date;
-    document.getElementById('edit-report-date').value = item.report_date;
+    if (!item) {
+        console.error("Report not found:", id);
+        return;
+    }
 
-    // Populate Anomalies Checkboxes
+    // Role Verification
+    if (!currentUser || currentUser.role !== 'Admin') {
+        alert("Unauthorized: Only Admins can edit reports.");
+        return;
+    }
+
+    // Set State
+    editingReport = item;
+    console.log("Editing Report State Set:", editingReport);
+
+    // Render/Show Modal
+    renderEditModal();
+}
+
+function renderEditModal() {
+    if (!editingReport) return;
+
+    const modal = document.getElementById('edit-modal');
+    if (!modal) {
+        console.error("Edit Modal DOM element missing!");
+        return;
+    }
+
+    // Populate Fields (Sync)
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || '';
+    };
+
+    setVal('edit-clinic', editingReport.clinic_name);
+    setVal('edit-staff', editingReport.staff_name);
+    setVal('edit-disc-type', editingReport.disc_type);
+    setVal('edit-lot', editingReport.lot_number);
+    setVal('edit-expiry', editingReport.expiry_date);
+    setVal('edit-error-date', editingReport.error_date);
+    setVal('edit-report-date', editingReport.report_date);
+    setVal('edit-do-number', editingReport.do_number);
+    setVal('edit-release-date', editingReport.release_date);
+
+    // Anomalies
     const container = document.getElementById('edit-anomaly-checkboxes');
-    container.innerHTML = '';
-    const existingAnomalies = item.abnormalities || [];
+    if (container) {
+        container.innerHTML = '';
+        const existingAnomalies = editingReport.abnormalities || [];
 
-    ANOMALY_OPTIONS.forEach((fullText, index) => {
-        const checkId = `edit-anomaly-${index}`;
-        const isChecked = existingAnomalies.includes(fullText) ? 'checked' : '';
-        const div = document.createElement('div');
-        div.className = 'checkbox-item';
-        div.innerHTML = `
-            <input type="checkbox" id="${checkId}" value="${fullText}" name="edit-anomalies" ${isChecked}>
-            <label for="${checkId}" style="margin-left:8px; color:#fff;">${fullText}</label>
-        `;
-        container.appendChild(div);
-    });
+        ANOMALY_OPTIONS.forEach((fullText, index) => {
+            const checkId = `edit-anomaly-${index}`;
+            const isChecked = existingAnomalies.includes(fullText) ? 'checked' : '';
+            const div = document.createElement('div');
+            div.className = 'checkbox-item';
+            div.innerHTML = `
+                <input type="checkbox" id="${checkId}" value="${fullText}" name="edit-anomalies" ${isChecked}>
+                <label for="${checkId}" style="margin-left:8px; color:#fff;">${fullText}</label>
+            `;
+            container.appendChild(div);
+        });
+    }
 
-    document.getElementById('edit-modal').classList.remove('hidden');
+    // Show Protocol
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex'; // Force flex
+    modal.style.zIndex = '3000'; // High Z-Index
 }
 
 window.openCompletionModal = function (id) {
@@ -537,19 +579,35 @@ document.addEventListener('DOMContentLoaded', () => {
     // Edit Modal Listeners
     const cancelEdit = document.getElementById('cancel-edit');
     const editForm = document.getElementById('edit-form');
-    const editModal = document.getElementById('edit-modal');
 
+    // Close Handler
     if (cancelEdit) {
         cancelEdit.addEventListener('click', () => {
-            editModal.classList.add('hidden');
-            currentEditId = null;
+            const modal = document.getElementById('edit-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+            editingReport = null;
         });
     }
 
+    // Update Handler
     if (editForm) {
         editForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!currentEditId) return;
+            console.log("Submitting Update for:", editingReport);
+
+            if (!editingReport) {
+                alert("No report selected for editing.");
+                return;
+            }
+
+            // Role Check again
+            if (currentUser.role !== 'Admin') {
+                alert("Unauthorized action.");
+                return;
+            }
 
             const btn = editForm.querySelector('button[type="submit"]');
             const originalText = btn.textContent;
@@ -564,17 +622,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 expiry_date: document.getElementById('edit-expiry').value,
                 error_date: document.getElementById('edit-error-date').value,
                 report_date: document.getElementById('edit-report-date').value,
+                do_number: document.getElementById('edit-do-number').value,
+                release_date: document.getElementById('edit-release-date').value,
                 abnormalities: Array.from(document.querySelectorAll('input[name="edit-anomalies"]:checked')).map(cb => cb.value)
             };
 
             try {
-                const { error } = await _supabase.from('report').update(payload).eq('id', currentEditId);
+                const { error } = await _supabase.from('report').update(payload).eq('id', editingReport.id);
                 if (error) throw error;
 
-                editModal.classList.add('hidden');
-                loadWorklist();
+                // Success
+                const modal = document.getElementById('edit-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.style.display = 'none';
+                }
+                editingReport = null;
+
+                alert("Report updated successfully!");
+                loadWorklist(); // Refresh list
+
             } catch (err) {
-                alert("Edit failed: " + err.message);
+                console.error("Update failed:", err);
+                alert("Update failed: " + err.message);
             } finally {
                 btn.textContent = originalText;
                 btn.disabled = false;
