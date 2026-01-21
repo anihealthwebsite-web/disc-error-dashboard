@@ -498,7 +498,7 @@ let allReports = [];
 // Expose to window for inline onclick (backup) or external calls
 window.handleEdit = function (id) {
     console.log("Edit requested for ID:", id);
-    const item = allReports.find(r => r.id === id);
+    const item = allReports.find(r => r.id == id);
 
     if (!item) {
         console.error("Report not found:", id);
