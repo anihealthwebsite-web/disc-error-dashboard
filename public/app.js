@@ -614,6 +614,12 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = "Saving...";
             btn.disabled = true;
 
+            // Helper: Convert empty strings to null for optional fields
+            const getVal = (id) => {
+                const val = document.getElementById(id).value;
+                return val.trim() === '' ? null : val;
+            };
+
             const payload = {
                 clinic_name: document.getElementById('edit-clinic').value,
                 staff_name: document.getElementById('edit-staff').value,
@@ -622,10 +628,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 expiry_date: document.getElementById('edit-expiry').value,
                 error_date: document.getElementById('edit-error-date').value,
                 report_date: document.getElementById('edit-report-date').value,
-                do_number: document.getElementById('edit-do-number').value,
-                release_date: document.getElementById('edit-release-date').value,
+                // Optional fields: send null if empty
+                do_number: getVal('edit-do-number'),
+                release_date: getVal('edit-release-date'),
                 abnormalities: Array.from(document.querySelectorAll('input[name="edit-anomalies"]:checked')).map(cb => cb.value)
             };
+
+            console.log("Update Payload:", payload);
 
             try {
                 const { error } = await _supabase.from('report').update(payload).eq('id', editingReport.id);
@@ -640,7 +649,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 editingReport = null;
 
                 alert("Report updated successfully!");
-                loadWorklist(); // Refresh list
+
+                // Clear and reload list to prevent "duplication" ghosts
+                document.getElementById('report-list').innerHTML = '<div class="loading">Refreshing...</div>';
+                allReports = [];
+                await loadWorklist();
 
             } catch (err) {
                 console.error("Update failed:", err);
