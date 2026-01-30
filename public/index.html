@@ -153,9 +153,29 @@
                 <section class="card worklist-panel">
                     <div class="card-header">
                         <h2>Worklist</h2>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div class="header-controls" style="display: flex; gap: 1rem; align-items: center;">
+                            <!-- Filter Toggle -->
+                            <div class="filter-toggle"
+                                style="background: rgba(255,255,255,0.1); padding: 4px; border-radius: 20px; display: flex;">
+                                <label
+                                    style="cursor: pointer; padding: 4px 12px; border-radius: 16px; transition: all 0.2s; font-size: 0.85rem;"
+                                    id="lbl-active">
+                                    <input type="radio" name="wl-filter" value="active" checked style="display:none"
+                                        onchange="applyWorklistFilter()">
+                                    Active
+                                </label>
+                                <label
+                                    style="cursor: pointer; padding: 4px 12px; border-radius: 16px; transition: all 0.2s; font-size: 0.85rem;"
+                                    id="lbl-completed">
+                                    <input type="radio" name="wl-filter" value="completed" style="display:none"
+                                        onchange="applyWorklistFilter()">
+                                    Completed
+                                </label>
+                            </div>
+                            <!-- Separator -->
+                            <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.2);"></div>
                             <span class="badge" id="active-count">0 Active</span>
-                            <button id="export-btn" class="btn-primary btn-small">Export Data</button>
+                            <button id="export-btn" class="btn-primary btn-small">Export</button>
                         </div>
                     </div>
                     <div class="card-content scrollable">

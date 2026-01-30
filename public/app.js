@@ -412,8 +412,39 @@ async function loadWorklist() {
 
     if (!error && data) {
         allReports = data; // Cache for edit
-        renderList(data);
+        applyWorklistFilter(); // Filter and render
     }
+}
+
+// Expose to window for the onchange attribute in HTML
+window.applyWorklistFilter = function () {
+    const filterValue = document.querySelector('input[name="wl-filter"]:checked').value;
+
+    // UI Feedback for Toggle
+    const lblActive = document.getElementById('lbl-active');
+    const lblCompleted = document.getElementById('lbl-completed');
+
+    if (filterValue === 'active') {
+        lblActive.style.background = 'rgba(255,255,255,0.2)';
+        lblActive.style.fontWeight = '600';
+        lblCompleted.style.background = 'transparent';
+        lblCompleted.style.fontWeight = '400';
+    } else {
+        lblActive.style.background = 'transparent';
+        lblActive.style.fontWeight = '400';
+        lblCompleted.style.background = 'rgba(255,255,255,0.2)';
+        lblCompleted.style.fontWeight = '600';
+    }
+
+    // Filter Logic
+    let filteredData = [];
+    if (filterValue === 'active') {
+        filteredData = allReports.filter(r => r.status === 'Pending');
+    } else {
+        filteredData = allReports.filter(r => r.status === 'Completed');
+    }
+
+    renderList(filteredData);
 }
 
 function renderList(data) {
