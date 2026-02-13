@@ -39,27 +39,32 @@ let currentFile = null;
 let currentUser = null;
 
 // --- 3. INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 App Initializing... v8-Auth");
 
-    // A. Check Session
-    checkSession();
+// Using 'load' instead of 'DOMContentLoaded' to ensure all external scripts (Supabase) are fully ready
+window.addEventListener('load', async () => {
+    console.log("🚀 App Initializing... v8-Auth (Window Load)");
 
-    // B. Setup Listeners
-    setupAuthListeners();
-    setupAppListeners(); // Formerly setupListeners
-
-    // C. Initialize Supabase (Always init for simplicity)
+    // A. Initialize Supabase (First Priority)
     try {
-        if (!window.supabase) throw new Error("Supabase SDK missing");
+        if (!window.supabase) {
+            console.error("❌ Supabase SDK NOT found on window.load");
+            throw new Error("Supabase SDK missing");
+        }
         _supabase = window.supabase.createClient(APP_SUPABASE_URL, APP_SUPABASE_ANON_KEY);
         console.log("✅ Supabase Connected (Safe Mode)");
     } catch (err) {
         console.error("Init Error:", err);
+        alert("System Error: Database connection failed. Please refresh.");
+        return;
     }
-});
 
-// --- 4. AUTHENTICATION LOGIC ---
+    // B. Check Session (Now safe to load data)
+    checkSession();
+
+    // C. Setup Listeners
+    setupAuthListeners();
+    setupAppListeners();
+});
 
 // --- 4. AUTHENTICATION LOGIC ---
 
@@ -69,11 +74,15 @@ function checkSession() {
         const sessionRole = localStorage.getItem('bio_role');
         const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
 
+        console.log("Checking Session:", { sessionUser, sessionRole, isLoggedIn });
+
         // Check legacy or new keys
         if (sessionUser && (sessionRole || isLoggedIn)) {
+            console.log("Session Valid. Restoring User:", sessionUser);
             currentUser = { username: sessionUser, role: sessionRole || 'User' };
             showDashboard();
         } else {
+            console.log("No valid session. Showing Login.");
             showLogin();
         }
     } catch (e) {
@@ -107,6 +116,10 @@ function showDashboard() {
     if (dashboard) {
         dashboard.style.display = 'block'; // Ensure block
         dashboard.classList.remove('hidden');
+        // Force layout recalculation to prevent display issues
+        setTimeout(() => {
+            dashboard.style.opacity = '1';
+        }, 10);
     }
 
     // Update Header
@@ -403,14 +416,35 @@ async function uploadImage(file) {
 }
 
 async function loadWorklist() {
-    if (!_supabase) return;
+    const list = document.getElementById('report-list');
+
+    if (!_supabase) {
+        console.warn("⚠️ Supabase Client NOT ready during loadWorklist call.");
+        if (list) list.innerHTML = '<div class="empty-state" style="color:red">Database not connected</div>';
+        return;
+    }
+
+    // Show Loading
+    if (list) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div style="margin-bottom:10px">⏳</div>
+                Loading reports...
+            </div>`;
+    }
 
     const { data, error } = await _supabase
         .from('report')
         .select('*')
         .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+        console.error("Fetch Error:", error);
+        if (list) list.innerHTML = `<div class="empty-state" style="color:red">Error: ${error.message}</div>`;
+        return;
+    }
+
+    if (data) {
         allReports = data; // Cache for edit
         applyWorklistFilter(); // Filter and render
     }
