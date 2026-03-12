@@ -31,7 +31,8 @@ const ANOMALY_OPTIONS = [
     'Disk anomaly 7: Sample/diluent mixing failure',
     'Disk anomaly 8: Abnormal resolubility of reagent ball',
     'Insufficient Sample',
-    'Disk Error'
+    'Disk Error',
+    'Error'
 ];
 
 let _supabase = null;
@@ -229,6 +230,22 @@ function setupAppListeners() {
         newHelper.addEventListener('change', handleImageChange);
     }
 
+    // 1b. Immunoassay toggle
+    const discTypeSelect = document.getElementById('disc-type');
+    if (discTypeSelect) {
+        discTypeSelect.addEventListener('change', (e) => {
+            const extraInput = document.getElementById('immunoassay-name');
+            if (e.target.value === 'Immunoassay') {
+                extraInput.style.display = 'block';
+                extraInput.required = true;
+            } else {
+                extraInput.style.display = 'none';
+                extraInput.required = false;
+                extraInput.value = '';
+            }
+        });
+    }
+
     // 2. Submit
     const form = document.getElementById('report-form');
     if (form) {
@@ -277,7 +294,13 @@ async function handleFormSubmit(e) {
     try {
         const clinicName = document.getElementById('clinic-name').value;
         const staffName = document.getElementById('sales-person').value;
-        const discType = document.getElementById('disc-type').value;
+        let discType = document.getElementById('disc-type').value;
+        if (discType === 'Immunoassay') {
+            const immunoName = document.getElementById('immunoassay-name').value;
+            if (immunoName) {
+                discType = `Immunoassay - ${immunoName}`;
+            }
+        }
         const lotNumber = document.getElementById('lot-number').value;
         const expiryDate = document.getElementById('disc-expiry').value;
         const errorDate = document.getElementById('error-date').value;
@@ -387,6 +410,13 @@ function resetUI() {
     currentFile = null;
     const label = document.getElementById('file-label');
     if (label) label.textContent = "Choose File...";
+    const immunoName = document.getElementById('immunoassay-name');
+    if (immunoName) {
+        immunoName.value = '';
+        immunoName.style.display = 'none';
+        immunoName.required = false;
+    }
+
     const preview = document.getElementById('image-preview');
     if (preview) {
         preview.innerHTML = '';
@@ -601,7 +631,28 @@ function renderEditModal() {
 
     setVal('edit-clinic', editingReport.clinic_name);
     setVal('edit-staff', editingReport.staff_name);
-    setVal('edit-disc-type', editingReport.disc_type);
+    let dt = editingReport.disc_type;
+    let immunoName = "";
+    if (dt && dt.startsWith('Immunoassay - ')) {
+        immunoName = dt.replace('Immunoassay - ', '');
+        dt = 'Immunoassay';
+    } else if (dt === 'Immunoassay') {
+        immunoName = "";
+    }
+    
+    setVal('edit-disc-type', dt);
+    
+    const editImmunoInput = document.getElementById('edit-immunoassay-name');
+    if (dt === 'Immunoassay') {
+        editImmunoInput.style.display = 'block';
+        editImmunoInput.value = immunoName;
+        editImmunoInput.required = true;
+    } else {
+        editImmunoInput.style.display = 'none';
+        editImmunoInput.value = '';
+        editImmunoInput.required = false;
+    }
+
     setVal('edit-lot', editingReport.lot_number);
     setVal('edit-expiry', editingReport.expiry_date);
     setVal('edit-error-date', editingReport.error_date);
@@ -644,6 +695,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Edit Modal Listeners
     const cancelEdit = document.getElementById('cancel-edit');
     const editForm = document.getElementById('edit-form');
+    const editDiscTypeSelect = document.getElementById('edit-disc-type');
+
+    if (editDiscTypeSelect) {
+        editDiscTypeSelect.addEventListener('change', (e) => {
+            const extraInput = document.getElementById('edit-immunoassay-name');
+            if (e.target.value === 'Immunoassay') {
+                extraInput.style.display = 'block';
+                extraInput.required = true;
+            } else {
+                extraInput.style.display = 'none';
+                extraInput.required = false;
+                extraInput.value = '';
+            }
+        });
+    }
 
     // Close Handler
     if (cancelEdit) {
@@ -688,7 +754,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const payload = {
                 clinic_name: document.getElementById('edit-clinic').value,
                 staff_name: document.getElementById('edit-staff').value,
-                disc_type: document.getElementById('edit-disc-type').value,
+                disc_type: document.getElementById('edit-disc-type').value === 'Immunoassay' 
+                            ? (document.getElementById('edit-immunoassay-name').value ? `Immunoassay - ${document.getElementById('edit-immunoassay-name').value}` : 'Immunoassay')
+                            : document.getElementById('edit-disc-type').value,
                 lot_number: document.getElementById('edit-lot').value,
                 expiry_date: document.getElementById('edit-expiry').value,
                 error_date: document.getElementById('edit-error-date').value,
