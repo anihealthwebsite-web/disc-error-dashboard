@@ -22,17 +22,7 @@ const CREDENTIALS = {
 };
 
 const ANOMALY_OPTIONS = [
-    'Disk anomaly 1: Partial absence of reagent ball',
-    'Disk anomaly 2: Diluent not enough',
-    'Disk anomaly 3: Lyophilization reagent deterioration',
-    'Disk anomaly 4: Diluent deterioration failure',
-    'Disk anomaly 5: Abnormal liquid distribution',
-    'Disk anomaly 6: Reagent colorimetric hole unfilled',
-    'Disk anomaly 7: Sample/diluent mixing failure',
-    'Disk anomaly 8: Abnormal resolubility of reagent ball',
-    'Insufficient Sample',
-    'Disk Error',
-    'Error'
+    'Others'
 ];
 
 let _supabase = null;
@@ -205,19 +195,25 @@ function renderCheckboxes() {
     const container = document.getElementById('anomaly-checkboxes');
     if (!container) return;
 
-    container.innerHTML = '';
+    container.innerHTML = `
+        <div class="checkbox-item" style="margin-bottom: 5px;">
+            <input type="checkbox" id="anomaly-others" value="Others" name="anomalies" checked>
+            <label for="anomaly-others" style="margin-left: 8px; color: #fff;">Others</label>
+        </div>
+        <input type="text" id="anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: block;" required>
+    `;
 
-    ANOMALY_OPTIONS.forEach((fullText, index) => {
-        const id = `anomaly-${index}`;
-        const div = document.createElement('div');
-        div.className = 'checkbox-item';
-        div.style.marginBottom = "5px";
-
-        div.innerHTML = `
-            <input type="checkbox" id="${id}" value="${fullText}" name="anomalies">
-            <label for="${id}" style="margin-left: 8px; color: #fff;">${fullText}</label>
-        `;
-        container.appendChild(div);
+    const cb = document.getElementById('anomaly-others');
+    const txt = document.getElementById('anomaly-others-text');
+    cb.addEventListener('change', () => {
+        if (cb.checked) {
+            txt.style.display = 'block';
+            txt.required = true;
+        } else {
+            txt.style.display = 'none';
+            txt.required = false;
+            txt.value = '';
+        }
     });
 }
 
@@ -306,11 +302,15 @@ async function handleFormSubmit(e) {
         const errorDate = document.getElementById('error-date').value;
         const reportDate = document.getElementById('report-date').value;
 
-        const abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
-            .map(cb => cb.value);
+        const cb = document.getElementById('anomaly-others');
+        const txt = document.getElementById('anomaly-others-text');
+        let abnormalities = [];
+        if (cb && cb.checked && txt && txt.value.trim() !== '') {
+            abnormalities = [txt.value.trim()];
+        }
 
         if (!clinicName || !discType || abnormalities.length === 0) {
-            alert("Missing required fields (Clinic, Disc Type, or Anomalies).");
+            alert("Missing required fields (Clinic, Disc Type, or Anomalies/Problem description).");
             throw new Error("Validation Failed");
         }
 
@@ -415,6 +415,17 @@ function resetUI() {
         immunoName.value = '';
         immunoName.style.display = 'none';
         immunoName.required = false;
+    }
+
+    const cb = document.getElementById('anomaly-others');
+    const txt = document.getElementById('anomaly-others-text');
+    if (cb) {
+        cb.checked = true;
+    }
+    if (txt) {
+        txt.value = '';
+        txt.style.display = 'block';
+        txt.required = true;
     }
 
     const preview = document.getElementById('image-preview');
@@ -665,17 +676,29 @@ function renderEditModal() {
     if (container) {
         container.innerHTML = '';
         const existingAnomalies = editingReport.abnormalities || [];
+        
+        const hasAnomalies = existingAnomalies.length > 0;
+        const valText = existingAnomalies.join(', ');
 
-        ANOMALY_OPTIONS.forEach((fullText, index) => {
-            const checkId = `edit-anomaly-${index}`;
-            const isChecked = existingAnomalies.includes(fullText) ? 'checked' : '';
-            const div = document.createElement('div');
-            div.className = 'checkbox-item';
-            div.innerHTML = `
-                <input type="checkbox" id="${checkId}" value="${fullText}" name="edit-anomalies" ${isChecked}>
-                <label for="${checkId}" style="margin-left:8px; color:#fff;">${fullText}</label>
-            `;
-            container.appendChild(div);
+        container.innerHTML = `
+            <div class="checkbox-item" style="margin-bottom: 5px;">
+                <input type="checkbox" id="edit-anomaly-others" value="Others" name="edit-anomalies" ${hasAnomalies ? 'checked' : ''}>
+                <label for="edit-anomaly-others" style="margin-left: 8px; color: #fff;">Others</label>
+            </div>
+            <input type="text" id="edit-anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: ${hasAnomalies ? 'block' : 'none'};" value="${valText}" ${hasAnomalies ? 'required' : ''}>
+        `;
+
+        const cb = document.getElementById('edit-anomaly-others');
+        const txt = document.getElementById('edit-anomaly-others-text');
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                txt.style.display = 'block';
+                txt.required = true;
+            } else {
+                txt.style.display = 'none';
+                txt.required = false;
+                txt.value = '';
+            }
         });
     }
 
@@ -751,6 +774,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 return val.trim() === '' ? null : val;
             };
 
+            const editCb = document.getElementById('edit-anomaly-others');
+            const editTxt = document.getElementById('edit-anomaly-others-text');
+            let abnormalities = [];
+            if (editCb && editCb.checked && editTxt && editTxt.value.trim() !== '') {
+                abnormalities = [editTxt.value.trim()];
+            }
+
+            if (abnormalities.length === 0) {
+                alert("Please specify the problem under Anomalies.");
+                btn.textContent = originalText;
+                btn.disabled = false;
+                return;
+            }
+
             const payload = {
                 clinic_name: document.getElementById('edit-clinic').value,
                 staff_name: document.getElementById('edit-staff').value,
@@ -764,7 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Optional fields: send null if empty
                 do_number: getVal('edit-do-number'),
                 release_date: getVal('edit-release-date'),
-                abnormalities: Array.from(document.querySelectorAll('input[name="edit-anomalies"]:checked')).map(cb => cb.value)
+                abnormalities: abnormalities
             };
 
             console.log("Update Payload:", payload);
