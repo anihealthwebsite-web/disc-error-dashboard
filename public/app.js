@@ -22,6 +22,7 @@ const CREDENTIALS = {
 };
 
 const ANOMALY_OPTIONS = [
+    'Insufficient Sample/Coagulation',
     'Others'
 ];
 
@@ -195,26 +196,42 @@ function renderCheckboxes() {
     const container = document.getElementById('anomaly-checkboxes');
     if (!container) return;
 
-    container.innerHTML = `
-        <div class="checkbox-item" style="margin-bottom: 5px;">
-            <input type="checkbox" id="anomaly-others" value="Others" name="anomalies" checked>
-            <label for="anomaly-others" style="margin-left: 8px; color: #fff;">Others</label>
-        </div>
-        <input type="text" id="anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: block;" required>
-    `;
-
-    const cb = document.getElementById('anomaly-others');
-    const txt = document.getElementById('anomaly-others-text');
-    cb.addEventListener('change', () => {
-        if (cb.checked) {
-            txt.style.display = 'block';
-            txt.required = true;
+    container.innerHTML = '';
+    
+    ANOMALY_OPTIONS.forEach((fullText, index) => {
+        const id = `anomaly-${index}`;
+        if (fullText === 'Others') {
+            container.innerHTML += `
+                <div class="checkbox-item" style="margin-bottom: 5px;">
+                    <input type="checkbox" id="${id}" value="Others" name="anomalies">
+                    <label for="${id}" style="margin-left: 8px; color: #fff;">Others</label>
+                </div>
+                <input type="text" id="anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: none;">
+            `;
         } else {
-            txt.style.display = 'none';
-            txt.required = false;
-            txt.value = '';
+            container.innerHTML += `
+                <div class="checkbox-item" style="margin-bottom: 5px;">
+                    <input type="checkbox" id="${id}" value="${fullText}" name="anomalies">
+                    <label for="${id}" style="margin-left: 8px; color: #fff;">${fullText}</label>
+                </div>
+            `;
         }
     });
+
+    const cb = document.querySelector('input[value="Others"][name="anomalies"]');
+    const txt = document.getElementById('anomaly-others-text');
+    if (cb && txt) {
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                txt.style.display = 'block';
+                txt.required = true;
+            } else {
+                txt.style.display = 'none';
+                txt.required = false;
+                txt.value = '';
+            }
+        });
+    }
 }
 
 function setupAppListeners() {
@@ -259,20 +276,30 @@ function setupAppListeners() {
 
 function handleImageChange(e) {
     try {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-        currentFile = file;
+        currentFile = Array.from(files);
         const label = document.getElementById('file-label');
-        if (label) label.textContent = file.name;
+        if (label) label.textContent = currentFile.length === 1 ? currentFile[0].name : `${currentFile.length} files selected`;
 
         const preview = document.getElementById('image-preview');
         if (preview) {
-            const url = URL.createObjectURL(file);
-            preview.innerHTML = `
-                <div style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden;">
-                    <img src="${url}" style="width: 100%; display: block; max-height: 200px; object-fit: cover;">
-                </div>`;
+            preview.innerHTML = '';
+            currentFile.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const url = URL.createObjectURL(file);
+                    preview.innerHTML += `
+                        <div style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; display: inline-block; width: 100px; height: 100px; margin-right: 10px;">
+                            <img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>`;
+                } else {
+                    preview.innerHTML += `
+                        <div style="margin-top: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; display: inline-block; margin-right: 10px; font-size: 0.8rem;">
+                            📄 ${file.name}
+                        </div>`;
+                }
+            });
             preview.classList.remove('hidden');
         }
     } catch (err) {
@@ -290,6 +317,7 @@ async function handleFormSubmit(e) {
     try {
         const clinicName = document.getElementById('clinic-name').value;
         const staffName = document.getElementById('sales-person').value;
+        const machineSerial = document.getElementById('machine-serial').value;
         let discType = document.getElementById('disc-type').value;
         if (discType === 'Immunoassay') {
             const immunoName = document.getElementById('immunoassay-name').value;
@@ -302,11 +330,14 @@ async function handleFormSubmit(e) {
         const errorDate = document.getElementById('error-date').value;
         const reportDate = document.getElementById('report-date').value;
 
-        const cb = document.getElementById('anomaly-others');
-        const txt = document.getElementById('anomaly-others-text');
-        let abnormalities = [];
-        if (cb && cb.checked && txt && txt.value.trim() !== '') {
-            abnormalities = [txt.value.trim()];
+        let abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
+            .filter(cb => cb.value !== 'Others')
+            .map(cb => cb.value);
+
+        const cbOthers = document.querySelector('input[value="Others"][name="anomalies"]');
+        const txtOthers = document.getElementById('anomaly-others-text');
+        if (cbOthers && cbOthers.checked && txtOthers && txtOthers.value.trim() !== '') {
+            abnormalities.push(txtOthers.value.trim());
         }
 
         if (!clinicName || !discType || abnormalities.length === 0) {
@@ -315,13 +346,14 @@ async function handleFormSubmit(e) {
         }
 
         let imageUrl = null;
-        if (currentFile) {
-            imageUrl = await uploadImage(currentFile);
+        if (currentFile && currentFile.length > 0) {
+            imageUrl = await uploadMultipleFiles(currentFile);
         }
 
         const payload = {
             clinic_name: clinicName,
             staff_name: staffName,
+            machine_serial: machineSerial,
             disc_type: discType,
             lot_number: lotNumber,
             expiry_date: expiryDate,
@@ -377,6 +409,7 @@ async function handleExport() {
         const rows = data.map(item => ({
             "Clinic Name": item.clinic_name,
             "Staff": item.staff_name,
+            "Machine Serial": item.machine_serial || 'N/A',
             "Disc Type": item.disc_type,
             "Lot Number": item.lot_number,
             "Expiry Date": item.expiry_date,
@@ -409,7 +442,7 @@ async function handleExport() {
 function resetUI() {
     currentFile = null;
     const label = document.getElementById('file-label');
-    if (label) label.textContent = "Choose File...";
+    if (label) label.textContent = "Choose File(s)...";
     const immunoName = document.getElementById('immunoassay-name');
     if (immunoName) {
         immunoName.value = '';
@@ -417,15 +450,14 @@ function resetUI() {
         immunoName.required = false;
     }
 
-    const cb = document.getElementById('anomaly-others');
+    const cbs = document.querySelectorAll('input[name="anomalies"]:checked');
+    cbs.forEach(cb => cb.checked = false);
+    
     const txt = document.getElementById('anomaly-others-text');
-    if (cb) {
-        cb.checked = true;
-    }
     if (txt) {
         txt.value = '';
-        txt.style.display = 'block';
-        txt.required = true;
+        txt.style.display = 'none';
+        txt.required = false;
     }
 
     const preview = document.getElementById('image-preview');
@@ -438,22 +470,26 @@ function resetUI() {
 
 // --- 7. BACKEND OPS ---
 
-async function uploadImage(file) {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_v6.${fileExt}`;
-    const filePath = `disc-photos/${fileName}`;
+async function uploadMultipleFiles(files) {
+    const urls = [];
+    for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.floor(Math.random()*1000)}.${fileExt}`;
+        const filePath = `disc-photos/${fileName}`;
 
-    const { error } = await _supabase.storage
-        .from('disc-images')
-        .upload(filePath, file);
+        const { error } = await _supabase.storage
+            .from('disc-images')
+            .upload(filePath, file);
 
-    if (error) throw error;
+        if (error) throw error;
 
-    const { data } = _supabase.storage
-        .from('disc-images')
-        .getPublicUrl(filePath);
+        const { data } = _supabase.storage
+            .from('disc-images')
+            .getPublicUrl(filePath);
 
-    return data.publicUrl;
+        urls.push(data.publicUrl);
+    }
+    return urls.join(',');
 }
 
 async function loadWorklist() {
@@ -547,9 +583,16 @@ function renderList(data) {
         }).join('');
 
         const imageThumb = item.image_url
-            ? `<div class="report-image-thumb" onclick="window.open('${item.image_url}', '_blank')">
-                 <img src="${item.image_url}" alt="Evidence">
-               </div>`
+            ? item.image_url.split(',').map(url => {
+                const isDoc = /\.(pdf|doc|docx|txt|csv|xlsx)$/i.test(url);
+                if(isDoc) {
+                    return `<a href="${url}" target="_blank" style="display:inline-block; margin-top:5px; margin-right:5px; padding:4px 8px; background:rgba(255,255,255,0.1); border-radius:4px; font-size:0.8rem; text-decoration:none; color:#fff;">📄 View Document</a>`;
+                } else {
+                    return `<div class="report-image-thumb" onclick="window.open('${url}', '_blank')" style="display:inline-block; margin-top:5px; margin-right:5px; width:60px; height:60px; overflow:hidden; border-radius:4px; cursor:pointer;">
+                                 <img src="${url}" alt="Evidence" style="width:100%; height:100%; object-fit:cover;">
+                               </div>`;
+                }
+              }).join('')
             : '';
 
         return `
@@ -564,10 +607,12 @@ function renderList(data) {
             
             <div style="margin-bottom: 5px; font-weight: 500;">
                 ${item.disc_type} <br>
-                <span style="font-size:0.8em; opacity:0.8">Lot: ${item.lot_number} | Exp: ${item.expiry_date}</span>
+                <span style="font-size:0.8em; opacity:0.8">Serial: ${item.machine_serial || 'N/A'} | Lot: ${item.lot_number} | Exp: ${item.expiry_date}</span>
             </div>
 
-            ${imageThumb}
+            <div style="display:flex; flex-wrap:wrap; margin-bottom:10px;">
+                ${imageThumb}
+            </div>
 
             <div class="report-anomalies">
                 ${anomalyBadges}
@@ -642,6 +687,7 @@ function renderEditModal() {
 
     setVal('edit-clinic', editingReport.clinic_name);
     setVal('edit-staff', editingReport.staff_name);
+    setVal('edit-machine-serial', editingReport.machine_serial);
     let dt = editingReport.disc_type;
     let immunoName = "";
     if (dt && dt.startsWith('Immunoassay - ')) {
@@ -677,29 +723,46 @@ function renderEditModal() {
         container.innerHTML = '';
         const existingAnomalies = editingReport.abnormalities || [];
         
-        const hasAnomalies = existingAnomalies.length > 0;
-        const valText = existingAnomalies.join(', ');
+        ANOMALY_OPTIONS.forEach((fullText, index) => {
+            const checkId = `edit-anomaly-${index}`;
+            
+            if (fullText === 'Others') {
+                const otherAnomalies = existingAnomalies.filter(a => !ANOMALY_OPTIONS.includes(a) || a === 'Others');
+                const hasOthers = otherAnomalies.length > 0;
+                const valText = hasOthers ? (otherAnomalies.join(', ') === 'Others' ? '' : otherAnomalies.join(', ')) : '';
 
-        container.innerHTML = `
-            <div class="checkbox-item" style="margin-bottom: 5px;">
-                <input type="checkbox" id="edit-anomaly-others" value="Others" name="edit-anomalies" ${hasAnomalies ? 'checked' : ''}>
-                <label for="edit-anomaly-others" style="margin-left: 8px; color: #fff;">Others</label>
-            </div>
-            <input type="text" id="edit-anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: ${hasAnomalies ? 'block' : 'none'};" value="${valText}" ${hasAnomalies ? 'required' : ''}>
-        `;
-
-        const cb = document.getElementById('edit-anomaly-others');
-        const txt = document.getElementById('edit-anomaly-others-text');
-        cb.addEventListener('change', () => {
-            if (cb.checked) {
-                txt.style.display = 'block';
-                txt.required = true;
+                container.innerHTML += `
+                    <div class="checkbox-item" style="margin-bottom: 5px;">
+                        <input type="checkbox" id="${checkId}" value="Others" name="edit-anomalies" ${hasOthers ? 'checked' : ''}>
+                        <label for="${checkId}" style="margin-left: 8px; color: #fff;">Others</label>
+                    </div>
+                    <input type="text" id="edit-anomaly-others-text" placeholder="Please specify the problem" style="margin-top: 10px; display: ${hasOthers ? 'block' : 'none'};" value="${valText}" ${hasOthers ? 'required' : ''}>
+                `;
             } else {
-                txt.style.display = 'none';
-                txt.required = false;
-                txt.value = '';
+                const isChecked = existingAnomalies.includes(fullText) ? 'checked' : '';
+                container.innerHTML += `
+                    <div class="checkbox-item" style="margin-bottom: 5px;">
+                        <input type="checkbox" id="${checkId}" value="${fullText}" name="edit-anomalies" ${isChecked}>
+                        <label for="${checkId}" style="margin-left:8px; color:#fff;">${fullText}</label>
+                    </div>
+                `;
             }
         });
+
+        const cb = document.querySelector('input[value="Others"][name="edit-anomalies"]');
+        const txt = document.getElementById('edit-anomaly-others-text');
+        if (cb && txt) {
+            cb.addEventListener('change', () => {
+                if (cb.checked) {
+                    txt.style.display = 'block';
+                    txt.required = true;
+                } else {
+                    txt.style.display = 'none';
+                    txt.required = false;
+                    txt.value = '';
+                }
+            });
+        }
     }
 
     // Show Protocol
@@ -774,11 +837,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return val.trim() === '' ? null : val;
             };
 
-            const editCb = document.getElementById('edit-anomaly-others');
-            const editTxt = document.getElementById('edit-anomaly-others-text');
-            let abnormalities = [];
-            if (editCb && editCb.checked && editTxt && editTxt.value.trim() !== '') {
-                abnormalities = [editTxt.value.trim()];
+            let abnormalities = Array.from(document.querySelectorAll('input[name="edit-anomalies"]:checked'))
+                .filter(cb => cb.value !== 'Others')
+                .map(cb => cb.value);
+            
+            const editCbOthers = document.querySelector('input[value="Others"][name="edit-anomalies"]');
+            const editTxtOthers = document.getElementById('edit-anomaly-others-text');
+            if (editCbOthers && editCbOthers.checked && editTxtOthers && editTxtOthers.value.trim() !== '') {
+                abnormalities.push(editTxtOthers.value.trim());
             }
 
             if (abnormalities.length === 0) {
@@ -791,6 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const payload = {
                 clinic_name: document.getElementById('edit-clinic').value,
                 staff_name: document.getElementById('edit-staff').value,
+                machine_serial: document.getElementById('edit-machine-serial').value,
                 disc_type: document.getElementById('edit-disc-type').value === 'Immunoassay' 
                             ? (document.getElementById('edit-immunoassay-name').value ? `Immunoassay - ${document.getElementById('edit-immunoassay-name').value}` : 'Immunoassay')
                             : document.getElementById('edit-disc-type').value,

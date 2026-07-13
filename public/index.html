@@ -74,7 +74,11 @@
                                 <div class="form-group">
                                     <label for="sales-person">Sales Person</label>
                                     <input type="text" id="sales-person" placeholder="Enter name" required>
-                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="machine-serial">Machine Serial Number</label>
+                                <input type="text" id="machine-serial" placeholder="Enter serial number" required>
                             </div>
 
                             <!-- New Disc ID Fields -->
@@ -157,8 +161,8 @@
                                 <label>Upload Photo of Disc</label>
                                 <div class="file-upload-wrapper">
                                     <div class="file-upload-ui">
-                                        <span id="file-label">Choose File...</span>
-                                        <input type="file" id="disc-photo" accept="image/*">
+                                        <span id="file-label">Choose File(s)...</span>
+                                        <input type="file" id="disc-photo" accept="image/*, .pdf, .doc, .docx" multiple>
                                     </div>
                                     <div id="image-preview" class="hidden"></div>
                                 </div>
@@ -263,6 +267,11 @@
                         <label>Sales Person</label>
                         <input type="text" id="edit-staff" required>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Machine Serial Number</label>
+                    <input type="text" id="edit-machine-serial" required>
                 </div>
 
                 <div class="form-group">
