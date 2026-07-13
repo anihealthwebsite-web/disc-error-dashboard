@@ -22,7 +22,17 @@ const CREDENTIALS = {
 };
 
 const ANOMALY_OPTIONS = [
+    'Disk anomaly 1: Partial absence of reagent ball',
+    'Disk anomaly 2: Diluent not enough',
+    'Disk anomaly 3: Lyophilization reagent deterioration',
+    'Disk anomaly 4: Diluent deterioration failure',
+    'Disk anomaly 5: Abnormal liquid distribution',
+    'Disk anomaly 6: Reagent colorimetric hole unfilled',
+    'Disk anomaly 7: Sample/diluent mixing failure',
+    'Disk anomaly 8: Abnormal resolubility of reagent ball',
     'Insufficient Sample/Coagulation',
+    'Disk Error',
+    'Error',
     'Others'
 ];
 
