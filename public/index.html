@@ -69,9 +69,8 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="clinic-name">Clinic Name</label>
-                                    <select id="clinic-name" required>
-                                        <option value="" disabled selected>Loading clinics...</option>
-                                    </select>
+                                    <input type="text" id="clinic-name" list="clinic-list" placeholder="Select or type clinic name" required autocomplete="off">
+                                    <datalist id="clinic-list"></datalist>
                                 </div>
                                 <div class="form-group">
                                     <label for="sales-person">Sales Person</label>
@@ -263,7 +262,8 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Clinic Name</label>
-                        <input type="text" id="edit-clinic" required>
+                        <input type="text" id="edit-clinic" list="edit-clinic-list" placeholder="Select or type clinic name" required autocomplete="off">
+                        <datalist id="edit-clinic-list"></datalist>
                     </div>
                     <div class="form-group">
                         <label>Sales Person</label>

@@ -39,6 +39,7 @@ const ANOMALY_OPTIONS = [
 let _supabase = null;
 let currentFile = null;
 let currentUser = null;
+let cachedClinics = {};
 
 // --- 3. INITIALIZATION ---
 
@@ -78,12 +79,13 @@ window.addEventListener('load', async () => {
 // ========================================
 
 /**
- * Fetch clinic list from Supabase and populate the clinic dropdown.
- * On selection, auto-fill the machine serial number (editable).
+ * Fetch clinic list from Supabase and populate the clinic datalists.
+ * Setup input listeners for auto-filling serial number.
  */
 async function loadClinics() {
-    const select = document.getElementById('clinic-name');
-    if (!select) return;
+    const list1 = document.getElementById('clinic-list');
+    const list2 = document.getElementById('edit-clinic-list');
+    if (!list1) return;
 
     try {
         const { data, error } = await _supabase
@@ -92,36 +94,90 @@ async function loadClinics() {
             .order('clinic_name', { ascending: true });
 
         if (error) throw error;
+        
+        cachedClinics = {};
+        list1.innerHTML = '';
+        if (list2) list2.innerHTML = '';
 
-        if (!data || data.length === 0) {
-            select.innerHTML = '<option value="" disabled selected>No clinics found — add them in Supabase</option>';
-            return;
+        if (data && data.length > 0) {
+            data.forEach(clinic => {
+                cachedClinics[clinic.clinic_name] = clinic.machine_serial;
+                
+                const opt1 = document.createElement('option');
+                opt1.value = clinic.clinic_name;
+                list1.appendChild(opt1);
+
+                if (list2) {
+                    const opt2 = document.createElement('option');
+                    opt2.value = clinic.clinic_name;
+                    list2.appendChild(opt2);
+                }
+            });
         }
 
-        // Build options
-        select.innerHTML = '<option value="" disabled selected>Select clinic…</option>';
-        data.forEach(clinic => {
-            const opt = document.createElement('option');
-            opt.value = clinic.clinic_name;
-            opt.textContent = clinic.clinic_name;
-            opt.dataset.serial = clinic.machine_serial || '';
-            select.appendChild(opt);
-        });
-
-        // Auto-fill serial when clinic is chosen
-        select.addEventListener('change', () => {
-            const chosen = select.options[select.selectedIndex];
-            const serialInput = document.getElementById('machine-serial');
-            if (serialInput && chosen && chosen.dataset.serial) {
-                serialInput.value = chosen.dataset.serial;
+        // Attach input listeners for auto-filling serials
+        const attachAutoFill = (inputId, serialId) => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                // Use input event so it fills as soon as they select or type a match
+                input.addEventListener('input', (e) => {
+                    const val = e.target.value.trim();
+                    const serialInput = document.getElementById(serialId);
+                    if (serialInput && cachedClinics[val]) {
+                        serialInput.value = cachedClinics[val];
+                    }
+                });
             }
-        });
+        };
+
+        attachAutoFill('clinic-name', 'machine-serial');
+        attachAutoFill('edit-clinic', 'edit-machine-serial');
 
     } catch (err) {
         console.error('Failed to load clinics:', err);
-        select.innerHTML = '<option value="" disabled selected>Error loading clinics</option>';
     }
 }
+
+/**
+ * Auto-saves a clinic if it is new or if its serial number was updated.
+ */
+async function saveClinicIfNeeded(clinicName, machineSerial) {
+    if (!clinicName || !machineSerial) return;
+    
+    // Only save if it's not in cache or if the serial has changed
+    if (!cachedClinics[clinicName] || cachedClinics[clinicName] !== machineSerial) {
+        try {
+            const { error } = await _supabase
+                .from('clinics')
+                .upsert([{ clinic_name: clinicName, machine_serial: machineSerial }], { onConflict: 'clinic_name' });
+            
+            if (!error) {
+                // Update local cache and datalists to instantly reflect it
+                if (!cachedClinics[clinicName]) {
+                    const dl1 = document.getElementById('clinic-list');
+                    if (dl1) {
+                        const opt = document.createElement('option');
+                        opt.value = clinicName;
+                        dl1.appendChild(opt);
+                    }
+                    const dl2 = document.getElementById('edit-clinic-list');
+                    if (dl2) {
+                        const opt = document.createElement('option');
+                        opt.value = clinicName;
+                        dl2.appendChild(opt);
+                    }
+                }
+                cachedClinics[clinicName] = machineSerial;
+                console.log("Clinic auto-saved to database.");
+            } else {
+                console.warn("Failed to auto-save clinic to database:", error.message);
+            }
+        } catch (err) {
+            console.error("Error auto-saving clinic:", err);
+        }
+    }
+}
+
 
 
 function checkSession() {
@@ -433,6 +489,9 @@ async function handleFormSubmit(e) {
             .insert([payload]);
 
         if (error) throw error;
+
+        // Auto-save the clinic & serial for future dropdown use
+        await saveClinicIfNeeded(clinicName, machineSerial);
 
         alert("Report Submitted Successfully!");
         e.target.reset();
@@ -940,6 +999,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const { error } = await _supabase.from('report').update(payload).eq('id', editingReport.id);
                 if (error) throw error;
+
+                // Auto-save the clinic & serial for future dropdown use
+                await saveClinicIfNeeded(payload.clinic_name, payload.machine_serial);
 
                 // Success
                 const modal = document.getElementById('edit-modal');
