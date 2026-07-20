@@ -69,7 +69,9 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="clinic-name">Clinic Name</label>
-                                    <input type="text" id="clinic-name" placeholder="Enter clinic name" required>
+                                    <select id="clinic-name" required>
+                                        <option value="" disabled selected>Loading clinics...</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="sales-person">Sales Person</label>
@@ -78,7 +80,7 @@
 
                             <div class="form-group">
                                 <label for="machine-serial">Machine Serial Number</label>
-                                <input type="text" id="machine-serial" placeholder="Enter serial number" required>
+                                <input type="text" id="machine-serial" placeholder="Auto-filled from clinic — editable if needed">
                             </div>
 
                             <!-- New Disc ID Fields -->

@@ -66,9 +66,63 @@ window.addEventListener('load', async () => {
     // C. Setup Listeners
     setupAuthListeners();
     setupAppListeners();
+
+    // D. Load Clinic List
+    loadClinics();
 });
 
 // --- 4. AUTHENTICATION LOGIC ---
+
+// ========================================
+// CLINICS LOADER
+// ========================================
+
+/**
+ * Fetch clinic list from Supabase and populate the clinic dropdown.
+ * On selection, auto-fill the machine serial number (editable).
+ */
+async function loadClinics() {
+    const select = document.getElementById('clinic-name');
+    if (!select) return;
+
+    try {
+        const { data, error } = await _supabase
+            .from('clinics')
+            .select('clinic_name, machine_serial')
+            .order('clinic_name', { ascending: true });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            select.innerHTML = '<option value="" disabled selected>No clinics found — add them in Supabase</option>';
+            return;
+        }
+
+        // Build options
+        select.innerHTML = '<option value="" disabled selected>Select clinic…</option>';
+        data.forEach(clinic => {
+            const opt = document.createElement('option');
+            opt.value = clinic.clinic_name;
+            opt.textContent = clinic.clinic_name;
+            opt.dataset.serial = clinic.machine_serial || '';
+            select.appendChild(opt);
+        });
+
+        // Auto-fill serial when clinic is chosen
+        select.addEventListener('change', () => {
+            const chosen = select.options[select.selectedIndex];
+            const serialInput = document.getElementById('machine-serial');
+            if (serialInput && chosen && chosen.dataset.serial) {
+                serialInput.value = chosen.dataset.serial;
+            }
+        });
+
+    } catch (err) {
+        console.error('Failed to load clinics:', err);
+        select.innerHTML = '<option value="" disabled selected>Error loading clinics</option>';
+    }
+}
+
 
 function checkSession() {
     try {
