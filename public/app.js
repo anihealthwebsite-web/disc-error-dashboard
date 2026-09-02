@@ -532,7 +532,7 @@ async function handleExport() {
         const rows = data.map(item => ({
             "Clinic Name": item.clinic_name,
             "Staff": item.staff_name,
-            "Machine Serial": item.machine_serial || 'N/A',
+            "Machine Serial": item.machine_serial || cachedClinics[item.clinic_name] || 'N/A',
             "Disc Type": item.disc_type,
             "Lot Number": item.lot_number,
             "Expiry Date": item.expiry_date,
@@ -730,7 +730,7 @@ function renderList(data) {
             
             <div style="margin-bottom: 5px; font-weight: 500;">
                 ${item.disc_type} <br>
-                <span style="font-size:0.8em; opacity:0.8">Serial: ${item.machine_serial || 'N/A'} | Lot: ${item.lot_number} | Exp: ${item.expiry_date}</span>
+                <span style="font-size:0.8em; opacity:0.8">Serial: ${item.machine_serial || cachedClinics[item.clinic_name] || 'N/A'} | Lot: ${item.lot_number} | Exp: ${item.expiry_date}</span>
             </div>
 
             <div style="display:flex; flex-wrap:wrap; margin-bottom:10px;">
