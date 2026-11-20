@@ -440,6 +440,7 @@ async function handleFormSubmit(e) {
         const machineSerial = document.getElementById('machine-serial').value;
         const claimType = document.getElementById('claim-type').value;
         const productLine = document.getElementById('product-line').value;
+        const instrumentModel = document.getElementById('instrument-model').value;
         let discType = document.getElementById('disc-type').value;
         if (discType === 'Immunoassay') {
             const immunoName = document.getElementById('immunoassay-name').value;
@@ -475,6 +476,7 @@ async function handleFormSubmit(e) {
         const payload = {
             claim_type: claimType,
             product_line: productLine,
+            instrument_model: instrumentModel,
             clinic_name: clinicName,
             machine_serial: machineSerial,
             disc_type: discType,
@@ -538,14 +540,14 @@ async function handleExport() {
             "Hospital Name":          item.clinic_name || '',
             "City":                   '',
             "Product Line":           item.product_line || '',
-            "Instrument Model":       item.disc_type || '',
+            "Instrument Model":       item.instrument_model || '',
             "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
-            "Claim Item":             item.lot_number || '',
-            "Reagent LOT":            item.expiry_date || '',
+            "Claim Item":             item.disc_type || '',
+            "Reagent LOT":            item.lot_number || '',
             "Claimed Cause":          (item.abnormalities || []).join(", "),
             "Attachment":             '',
-            "Claimed Quantity (pcs)": item.error_date || '',
-            "Test Date":              item.report_date || '',
+            "Claimed Quantity (pcs)": '',
+            "Test Date":              item.error_date || '',
             "Sample ID":              '',
             "Abnormal Parameter":     (item.abnormalities || []).join(", "),
             "Salesperson":            item.staff_name || '',

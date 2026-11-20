@@ -99,9 +99,21 @@
                                 </div>
                             </div>
 
-                            <!-- Instrument Model (Disc Type) -->
+                            <!-- Instrument Model -->
                             <div class="form-group">
-                                <label for="disc-type">Instrument Model (Disc Type)</label>
+                                <label for="instrument-model">Instrument Model</label>
+                                <select id="instrument-model" required>
+                                    <option value="" disabled selected>Select Instrument Model</option>
+                                    <option value="VetXpert Cube">VetXpert Cube</option>
+                                    <option value="VetXpert C5">VetXpert C5</option>
+                                    <option value="VetXpert I3">VetXpert I3</option>
+                                    <option value="Vetube30">Vetube30</option>
+                                </select>
+                            </div>
+
+                            <!-- Claim Item (Disc Type) -->
+                            <div class="form-group">
+                                <label for="disc-type">Claim Item (Type of Disc)</label>
                                 <select id="disc-type" required>
                                     <option value="" disabled selected>Select Disc Type</option>
                                     <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
