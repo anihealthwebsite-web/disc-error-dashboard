@@ -66,25 +66,42 @@
                     </div>
                     <div class="card-content">
                         <form id="report-form">
+                            <!-- Row 1: Claim Type + Product Line -->
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="clinic-name">Clinic Name</label>
+                                    <label for="claim-type">Claim Type</label>
+                                    <select id="claim-type" required>
+                                        <option value="" disabled selected>Select Claim Type</option>
+                                        <option value="Result Issue">Result Issue</option>
+                                        <option value="Others">Others</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-line">Product Line</label>
+                                    <select id="product-line" required>
+                                        <option value="" disabled selected>Select Product Line</option>
+                                        <option value="Biochemistry">Biochemistry</option>
+                                        <option value="Immunoassay">Immunoassay</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Clinic Name + Serial -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="clinic-name">Hospital Name</label>
                                     <input type="text" id="clinic-name" list="clinic-list" placeholder="Select or type clinic name" required autocomplete="off">
                                     <datalist id="clinic-list"></datalist>
                                 </div>
                                 <div class="form-group">
-                                    <label for="sales-person">Sales Person</label>
-                                    <input type="text" id="sales-person" placeholder="Enter name" required>
+                                    <label for="machine-serial">Instrument Serial No.</label>
+                                    <input type="text" id="machine-serial" placeholder="Auto-filled from clinic — editable if needed">
+                                </div>
                             </div>
 
+                            <!-- Instrument Model (Disc Type) -->
                             <div class="form-group">
-                                <label for="machine-serial">Machine Serial Number</label>
-                                <input type="text" id="machine-serial" placeholder="Auto-filled from clinic — editable if needed">
-                            </div>
-
-                            <!-- New Disc ID Fields -->
-                            <div class="form-group">
-                                <label for="disc-type">Type of Disc</label>
+                                <label for="disc-type">Instrument Model (Disc Type)</label>
                                 <select id="disc-type" required>
                                     <option value="" disabled selected>Select Disc Type</option>
                                     <option value="Comprehensive Diagnosis Panel">Comprehensive Diagnosis Panel</option>
@@ -158,8 +175,14 @@
                                 </div>
                             </div>
 
+                            <!-- Salesperson -->
                             <div class="form-group">
-                                <label>Upload Photo of Disc</label>
+                                <label for="sales-person">Salesperson</label>
+                                <input type="text" id="sales-person" placeholder="Enter name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Upload Photo / Attachment</label>
                                 <div class="file-upload-wrapper">
                                     <div class="file-upload-ui">
                                         <span id="file-label">Choose File(s)...</span>

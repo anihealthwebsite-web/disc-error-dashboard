@@ -438,6 +438,8 @@ async function handleFormSubmit(e) {
         const clinicName = document.getElementById('clinic-name').value;
         const staffName = document.getElementById('sales-person').value;
         const machineSerial = document.getElementById('machine-serial').value;
+        const claimType = document.getElementById('claim-type').value;
+        const productLine = document.getElementById('product-line').value;
         let discType = document.getElementById('disc-type').value;
         if (discType === 'Immunoassay') {
             const immunoName = document.getElementById('immunoassay-name').value;
@@ -471,8 +473,9 @@ async function handleFormSubmit(e) {
         }
 
         const payload = {
+            claim_type: claimType,
+            product_line: productLine,
             clinic_name: clinicName,
-            staff_name: staffName,
             machine_serial: machineSerial,
             disc_type: discType,
             lot_number: lotNumber,
@@ -480,6 +483,7 @@ async function handleFormSubmit(e) {
             error_date: errorDate,
             report_date: reportDate,
             abnormalities: abnormalities,
+            staff_name: staffName,
             image_url: imageUrl,
             status: 'Pending'
         };
@@ -528,19 +532,24 @@ async function handleExport() {
             return;
         }
 
-        // Format Data
+        // Format Data — columns match the target Excel layout
         const rows = data.map(item => ({
-            "Clinic Name": item.clinic_name,
-            "Staff": item.staff_name,
-            "Machine Serial": item.machine_serial || cachedClinics[item.clinic_name] || 'N/A',
-            "Disc Type": item.disc_type,
-            "Lot Number": item.lot_number,
-            "Expiry Date": item.expiry_date,
-            "Error Date": item.error_date,
-            "Date Reported": item.report_date,
-            "Abnormalities": (item.abnormalities || []).join(", "),
-            "Image URL": item.image_url,
-            "Status": item.status
+            "Claim Type":             item.claim_type || '',
+            "Hospital Name":          item.clinic_name || '',
+            "City":                   '',
+            "Product Line":           item.product_line || '',
+            "Instrument Model":       item.disc_type || '',
+            "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
+            "Claim Item":             item.lot_number || '',
+            "Reagent LOT":            item.expiry_date || '',
+            "Claimed Cause":          (item.abnormalities || []).join(", "),
+            "Attachment":             '',
+            "Claimed Quantity (pcs)": item.error_date || '',
+            "Test Date":              item.report_date || '',
+            "Sample ID":              '',
+            "Abnormal Parameter":     (item.abnormalities || []).join(", "),
+            "Salesperson":            item.staff_name || '',
+            "Image URL":              item.image_url || ''
         }));
 
         // Generate Filename: BioChem_Reports_YYYY-MM-DD.csv
