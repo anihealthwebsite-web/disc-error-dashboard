@@ -52,6 +52,7 @@ async function fetchReportsFromSheets() {
             }
 
             return {
+                process_no: row.process_no || row['Process No.'] || '',
                 id: row.id || '',
                 created_at: row.created_at || '',
                 status: row.status || 'Pending',
@@ -90,6 +91,21 @@ async function createReportInSheets(reportData, imageUrl) {
     const id = 'REP-' + Date.now();
     const timestamp = new Date().toISOString();
 
+    // Auto-increment Process No. by 1 based on existing reports
+    let nextProcessNo = 1;
+    try {
+        const existing = await fetchReportsFromSheets();
+        if (existing && existing.length > 0) {
+            const maxNo = existing.reduce((max, r) => {
+                const n = parseInt(r.process_no, 10);
+                return !isNaN(n) && n > max ? n : max;
+            }, 0);
+            nextProcessNo = maxNo > 0 ? maxNo + 1 : existing.length + 1;
+        }
+    } catch (e) {
+        console.warn('Could not determine max process_no, defaulting to 1:', e);
+    }
+
     const anomaliesStr = Array.isArray(reportData.abnormalities)
         ? reportData.abnormalities.join('; ')
         : (reportData.abnormalities || '');
@@ -98,6 +114,7 @@ async function createReportInSheets(reportData, imageUrl) {
     const isImage = firstUrl && !/\.(pdf|doc|docx|txt|csv|xlsx)$/i.test(firstUrl);
 
     const sheetRow = {
+        process_no: nextProcessNo,
         id: id,
         created_at: timestamp,
         status: reportData.status || 'Pending',

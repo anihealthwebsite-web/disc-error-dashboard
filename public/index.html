@@ -430,6 +430,37 @@
             </div>
         </div>
     </div>
+    <!-- Export Date Range Modal -->
+    <div id="export-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 440px;">
+            <h3 id="export-modal-title">Export Reports (.xlsx)</h3>
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 1rem;">
+                Select a date range to filter exported records, or leave blank to export all.
+            </p>
+            <div class="form-group">
+                <label for="export-date-field">Filter By Date</label>
+                <select id="export-date-field">
+                    <option value="error_date" selected>Test Date</option>
+                    <option value="report_date">Date Reported</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="export-start-date">From Date</label>
+                    <input type="date" id="export-start-date">
+                </div>
+                <div class="form-group">
+                    <label for="export-end-date">To Date</label>
+                    <input type="date" id="export-end-date">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancel-export" class="btn-secondary">Cancel</button>
+                <button type="button" id="confirm-export" class="btn-primary">Download .xlsx</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Host Configuration Modal -->
     <div id="sheets-config-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 500px;">

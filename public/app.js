@@ -420,12 +420,31 @@ function setupAppListeners() {
     // 3. Export
     const exportBtn = document.getElementById('export-btn');
     if (exportBtn) {
-        exportBtn.addEventListener('click', () => handleExport(false));
+        exportBtn.addEventListener('click', () => openExportModal(false));
     }
 
     const mindrayExportBtn = document.getElementById('mindray-export-btn');
     if (mindrayExportBtn) {
-        mindrayExportBtn.addEventListener('click', () => handleExport(true));
+        mindrayExportBtn.addEventListener('click', () => openExportModal(true));
+    }
+
+    const cancelExportBtn = document.getElementById('cancel-export');
+    const confirmExportBtn = document.getElementById('confirm-export');
+    const exportModal = document.getElementById('export-modal');
+
+    if (cancelExportBtn && exportModal) {
+        cancelExportBtn.addEventListener('click', () => {
+            exportModal.classList.add('hidden');
+        });
+    }
+
+    if (confirmExportBtn && exportModal) {
+        confirmExportBtn.addEventListener('click', () => {
+            const dateField = document.getElementById('export-date-field')?.value || 'error_date';
+            const startDate = document.getElementById('export-start-date')?.value || '';
+            const endDate = document.getElementById('export-end-date')?.value || '';
+            handleExport(pendingExportMindray, dateField, startDate, endDate);
+        });
     }
 }
 
@@ -566,12 +585,28 @@ async function handleFormSubmit(e) {
     }
 }
 
-async function handleExport(isMindray = false) {
-    const btn = document.getElementById(isMindray ? 'mindray-export-btn' : 'export-btn');
-    const originalText = btn ? btn.textContent : 'Export';
-    if (btn) {
-        btn.textContent = "Exporting...";
-        btn.disabled = true;
+let pendingExportMindray = false;
+
+function openExportModal(isMindray = false) {
+    pendingExportMindray = isMindray;
+    const modal = document.getElementById('export-modal');
+    const title = document.getElementById('export-modal-title');
+    if (title) {
+        title.textContent = isMindray ? 'Mindray Claim Export (.xlsx)' : 'Export Reports (.xlsx)';
+    }
+    if (modal) {
+        modal.classList.remove('hidden');
+    } else {
+        handleExport(isMindray);
+    }
+}
+
+async function handleExport(isMindray = false, dateField = 'error_date', startDate = '', endDate = '') {
+    const confirmBtn = document.getElementById('confirm-export');
+    const originalText = confirmBtn ? confirmBtn.textContent : 'Download .xlsx';
+    if (confirmBtn) {
+        confirmBtn.textContent = "Exporting...";
+        confirmBtn.disabled = true;
     }
 
     try {
@@ -594,9 +629,29 @@ async function handleExport(isMindray = false) {
             return;
         }
 
-        // Format Data — columns match requested order
-        const rows = data.map(item => {
+        // Filter by selected date range if provided
+        if (startDate || endDate) {
+            data = data.filter(item => {
+                const rawDate = (item[dateField] || '').slice(0, 10);
+                if (!rawDate) return false;
+                if (startDate && rawDate < startDate) return false;
+                if (endDate && rawDate > endDate) return false;
+                return true;
+            });
+
+            if (data.length === 0) {
+                alert("No reports found in the selected date range.");
+                return;
+            }
+        }
+
+        // Sort oldest-to-newest so Process No. increases sequentially
+        const ordered = [...data].reverse();
+
+        // Format Data — Process No. first, followed by requested columns
+        const rows = ordered.map((item, index) => {
             const row = {
+                "Process No.":            item.process_no || (index + 1),
                 "Claim Type":             item.claim_type || '',
                 "Hospital Name":          isMindray ? '' : (item.clinic_name || ''),
                 "City":                   '',
@@ -620,9 +675,10 @@ async function handleExport(isMindray = false) {
 
         // Generate Filename
         const dateStr = new Date().toISOString().split('T')[0];
+        const rangeSuffix = (startDate || endDate) ? `_${startDate || 'start'}_to_${endDate || 'end'}` : `_${dateStr}`;
         const filename = isMindray
-            ? `Mindray_Claim_Export_${dateStr}.xlsx`
-            : `BioChem_Reports_${dateStr}.xlsx`;
+            ? `Mindray_Claim_Export${rangeSuffix}.xlsx`
+            : `BioChem_Reports${rangeSuffix}.xlsx`;
 
         // Create Workbook & Download
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -630,13 +686,16 @@ async function handleExport(isMindray = false) {
         XLSX.utils.book_append_sheet(wb, ws, "Reports");
         XLSX.writeFile(wb, filename);
 
+        const exportModal = document.getElementById('export-modal');
+        if (exportModal) exportModal.classList.add('hidden');
+
     } catch (err) {
         console.error("Export Failed:", err);
         alert("Failed to export data: " + err.message);
     } finally {
-        if (btn) {
-            btn.textContent = originalText;
-            btn.disabled = false;
+        if (confirmBtn) {
+            confirmBtn.textContent = originalText;
+            confirmBtn.disabled = false;
         }
     }
 }
