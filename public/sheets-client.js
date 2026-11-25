@@ -1,161 +1,214 @@
 /**
- * Google Sheets API Client for BioChem Analyzer Monitor
- * Connects frontend directly to Google Apps Script Web App
+ * SheetDB API Client for BioChem Analyzer Monitor
+ * Uses SheetDB.io as a REST API layer over Google Sheets
+ * Images are uploaded to Supabase Storage; URLs stored in Sheet
  */
 
-// Configuration: Replace with your deployed Google Apps Script Web App URL
-let GOOGLE_SCRIPT_URL = localStorage.getItem('GOOGLE_SCRIPT_URL') || '';
+// Default SheetDB API URL (can be overridden via Host Settings)
+let SHEETDB_API_URL = localStorage.getItem('GOOGLE_SCRIPT_URL') || 'https://sheetdb.io/api/v1/6i5sxhqezg5tq';
 
 /**
- * Configure or update the Google Apps Script Web App URL
+ * Configure or update the SheetDB API URL
  */
 function setGoogleScriptUrl(url) {
-    GOOGLE_SCRIPT_URL = (url || '').trim();
-    if (GOOGLE_SCRIPT_URL) {
-        localStorage.setItem('GOOGLE_SCRIPT_URL', GOOGLE_SCRIPT_URL);
+    SHEETDB_API_URL = (url || '').trim();
+    if (SHEETDB_API_URL) {
+        localStorage.setItem('GOOGLE_SCRIPT_URL', SHEETDB_API_URL);
     } else {
         localStorage.removeItem('GOOGLE_SCRIPT_URL');
     }
 }
 
 /**
- * Check if Google Sheets backend is configured
+ * Check if SheetDB backend is configured
  */
 function isGoogleSheetsConfigured() {
-    return Boolean(GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith('https://script.google.com'));
+    return Boolean(SHEETDB_API_URL && (
+        SHEETDB_API_URL.includes('sheetdb.io') ||
+        SHEETDB_API_URL.startsWith('https://script.google.com')
+    ));
 }
 
-/**
- * Helper to convert browser File objects to Base64 payloads
- */
-async function filesToBase64Payload(fileList) {
-    if (!fileList || fileList.length === 0) return [];
-    
-    const promises = Array.from(fileList).map(file => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result;
-                const base64 = result.indexOf(',') > -1 ? result.split(',')[1] : result;
-                resolve({
-                    name: file.name,
-                    type: file.type || 'image/jpeg',
-                    base64: base64
-                });
-            };
-            reader.onerror = err => reject(err);
-            reader.readAsDataURL(file);
-        });
-    });
-
-    return Promise.all(promises);
-}
+// ========================================
+// REPORTS
+// ========================================
 
 /**
- * Safe fetch helper for Google Apps Script POST requests
- * Sends as text/plain to avoid CORS preflight OPTIONS blocking
- */
-async function postToSheetsApi(payload) {
-    if (!isGoogleSheetsConfigured()) {
-        throw new Error('Google Script URL is not configured. Please set GOOGLE_SCRIPT_URL in settings or app.js.');
-    }
-
-    const response = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-        },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        throw new Error(`HTTP Error ${response.status}: Failed to communicate with Google Sheets.`);
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-        throw new Error(result.error || 'Google Sheets backend encountered an error.');
-    }
-
-    return result;
-}
-
-/**
- * Fetch all reports from Google Sheets
+ * Fetch all reports from Google Sheets via SheetDB
  */
 async function fetchReportsFromSheets() {
     if (!isGoogleSheetsConfigured()) return [];
 
     try {
-        const url = `${GOOGLE_SCRIPT_URL}?action=getReports&t=${Date.now()}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-        const result = await response.json();
-        return result.success ? (result.data || []) : [];
+        const response = await fetch(`${SHEETDB_API_URL}?sheet=Reports&sort_by=created_at&sort_order=desc`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const rows = await response.json();
+
+        // Convert SheetDB flat rows into the format the app expects
+        return (rows || []).map(row => {
+            let abnormalities = [];
+            if (row.abnormalities) {
+                abnormalities = String(row.abnormalities).split('; ').map(s => s.trim()).filter(Boolean);
+            }
+
+            return {
+                id: row.id || '',
+                created_at: row.created_at || '',
+                status: row.status || 'Pending',
+                clinic_name: row.clinic_name || '',
+                machine_serial: row.machine_serial || '',
+                claim_type: row.claim_type || '',
+                product_line: row.product_line || '',
+                instrument_model: row.instrument_model || '',
+                disc_type: row.disc_type || '',
+                lot_number: row.lot_number || '',
+                expiry_date: row.expiry_date || '',
+                error_date: row.error_date || '',
+                report_date: row.report_date || '',
+                abnormalities: abnormalities,
+                staff_name: row.staff_name || '',
+                image_url: row.image_url || '',
+                do_number: row.do_number || '',
+                release_date: row.release_date || ''
+            };
+        });
     } catch (err) {
-        console.error('Error fetching reports from Google Sheets:', err);
+        console.error('Error fetching reports from SheetDB:', err);
         throw err;
     }
 }
 
 /**
- * Fetch clinics for autocomplete from Google Sheets
+ * Create a new report in Google Sheets via SheetDB
+ * Images should already be uploaded to Supabase; imageUrl is the resulting URL string
+ */
+async function createReportInSheets(reportData, imageUrl) {
+    if (!isGoogleSheetsConfigured()) throw new Error('SheetDB not configured');
+
+    const id = 'REP-' + Date.now();
+    const timestamp = new Date().toISOString();
+
+    const anomaliesStr = Array.isArray(reportData.abnormalities)
+        ? reportData.abnormalities.join('; ')
+        : (reportData.abnormalities || '');
+
+    const sheetRow = {
+        id: id,
+        created_at: timestamp,
+        status: reportData.status || 'Pending',
+        clinic_name: reportData.clinic_name || '',
+        machine_serial: reportData.machine_serial || '',
+        claim_type: reportData.claim_type || '',
+        product_line: reportData.product_line || '',
+        instrument_model: reportData.instrument_model || '',
+        disc_type: reportData.disc_type || '',
+        lot_number: reportData.lot_number || '',
+        expiry_date: reportData.expiry_date || '',
+        error_date: reportData.error_date || '',
+        report_date: reportData.report_date || '',
+        abnormalities: anomaliesStr,
+        staff_name: reportData.staff_name || '',
+        image_url: imageUrl || '',
+        do_number: reportData.do_number || '',
+        release_date: reportData.release_date || ''
+    };
+
+    const response = await fetch(`${SHEETDB_API_URL}?sheet=Reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [sheetRow] })
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`SheetDB POST failed (${response.status}): ${text}`);
+    }
+
+    const result = await response.json();
+    return { success: true, id: id, image_url: imageUrl };
+}
+
+/**
+ * Update an existing report in Google Sheets via SheetDB
+ * Updates the row where column 'id' matches reportId
+ */
+async function updateReportInSheets(reportId, updates) {
+    if (!isGoogleSheetsConfigured()) throw new Error('SheetDB not configured');
+
+    // Convert abnormalities array to semicolon-separated string
+    const patchData = { ...updates };
+    if (Array.isArray(patchData.abnormalities)) {
+        patchData.abnormalities = patchData.abnormalities.join('; ');
+    }
+
+    const response = await fetch(`${SHEETDB_API_URL}/id/${encodeURIComponent(reportId)}?sheet=Reports`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: patchData })
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`SheetDB PATCH failed (${response.status}): ${text}`);
+    }
+
+    return await response.json();
+}
+
+// ========================================
+// CLINICS
+// ========================================
+
+/**
+ * Fetch clinics from the Clinics sheet via SheetDB
  */
 async function fetchClinicsFromSheets() {
     if (!isGoogleSheetsConfigured()) return [];
 
     try {
-        const url = `${GOOGLE_SCRIPT_URL}?action=getClinics&t=${Date.now()}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-        const result = await response.json();
-        return result.success ? (result.data || []) : [];
+        const response = await fetch(`${SHEETDB_API_URL}?sheet=Clinics`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const rows = await response.json();
+
+        return (rows || []).map(row => ({
+            clinic_name: (row.clinic_name || '').trim(),
+            machine_serial: (row.machine_serial || '').trim()
+        })).filter(c => c.clinic_name);
     } catch (err) {
-        console.error('Error fetching clinics from Google Sheets:', err);
+        console.error('Error fetching clinics from SheetDB:', err);
         return [];
     }
 }
 
 /**
- * Create a new report in Google Sheets with embedded in-cell photos
- */
-async function createReportInSheets(reportData, files) {
-    const encodedFiles = await filesToBase64Payload(files);
-    const payload = {
-        action: 'createReport',
-        data: reportData,
-        files: encodedFiles
-    };
-
-    return await postToSheetsApi(payload);
-}
-
-/**
- * Update an existing report in Google Sheets (edit or mark complete)
- */
-async function updateReportInSheets(reportId, updates) {
-    const payload = {
-        action: 'updateReport',
-        id: reportId,
-        updates: updates
-    };
-
-    return await postToSheetsApi(payload);
-}
-
-/**
- * Save clinic to Clinics sheet
+ * Save a clinic to the Clinics sheet via SheetDB
  */
 async function saveClinicToSheets(clinicName, machineSerial) {
-    if (!clinicName) return;
+    if (!clinicName || !isGoogleSheetsConfigured()) return;
+
     try {
-        const payload = {
-            action: 'saveClinic',
-            clinic_name: clinicName,
-            machine_serial: machineSerial
-        };
-        await postToSheetsApi(payload);
+        // Check if clinic already exists
+        const existing = await fetchClinicsFromSheets();
+        const found = existing.find(c => c.clinic_name.toLowerCase() === clinicName.toLowerCase());
+
+        if (found) {
+            // Update serial if changed
+            if (machineSerial && found.machine_serial !== machineSerial) {
+                await fetch(`${SHEETDB_API_URL}/clinic_name/${encodeURIComponent(clinicName)}?sheet=Clinics`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { machine_serial: machineSerial } })
+                });
+            }
+        } else {
+            // Create new clinic
+            await fetch(`${SHEETDB_API_URL}?sheet=Clinics`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: [{ clinic_name: clinicName, machine_serial: machineSerial || '' }] })
+            });
+        }
     } catch (err) {
-        console.warn('Could not auto-save clinic to Google Sheets:', err);
+        console.warn('Could not auto-save clinic to SheetDB:', err);
     }
 }

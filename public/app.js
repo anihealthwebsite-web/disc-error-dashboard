@@ -517,9 +517,12 @@ async function handleFormSubmit(e) {
         };
 
         if (getActiveBackend() === 'google_sheets' && typeof createReportInSheets === 'function') {
-            // Google Sheets: send files as base64 for in-cell image embedding
-            const result = await createReportInSheets(payload, currentFile || []);
-            payload.image_url = result.image_url || '';
+            // SheetDB path: upload images to Supabase Storage first for URLs, then save report to Sheet
+            let imageUrl = '';
+            if (currentFile && currentFile.length > 0 && _supabase) {
+                imageUrl = await uploadMultipleFiles(currentFile);
+            }
+            await createReportInSheets(payload, imageUrl);
         } else {
             // Supabase path
             let imageUrl = null;
@@ -1173,8 +1176,8 @@ function setupSheetsConfigListeners() {
 
     // Open modal
     configBtn.addEventListener('click', () => {
-        if (urlInput && typeof GOOGLE_SCRIPT_URL !== 'undefined') {
-            urlInput.value = GOOGLE_SCRIPT_URL || '';
+        if (urlInput && typeof SHEETDB_API_URL !== 'undefined') {
+            urlInput.value = SHEETDB_API_URL || '';
         }
         if (statusDiv) statusDiv.innerHTML = '';
         configModal.classList.remove('hidden');
@@ -1191,19 +1194,20 @@ function setupSheetsConfigListeners() {
     if (testBtn) {
         testBtn.addEventListener('click', async () => {
             const url = urlInput ? urlInput.value.trim() : '';
-            if (!url || !url.startsWith('https://script.google.com')) {
-                if (statusDiv) statusDiv.innerHTML = '<span style="color: #f87171;">❌ Invalid URL. Must start with https://script.google.com</span>';
+            if (!url || (!url.includes('sheetdb.io') && !url.startsWith('https://script.google.com'))) {
+                if (statusDiv) statusDiv.innerHTML = '<span style="color: #f87171;">❌ Invalid URL. Must be a SheetDB API URL (sheetdb.io/api/...)</span>';
                 return;
             }
             if (statusDiv) statusDiv.innerHTML = '<span style="color: #94a3b8;">⏳ Testing connection...</span>';
 
             try {
-                const resp = await fetch(`${url}?action=getReports&t=${Date.now()}`);
+                const resp = await fetch(`${url}?sheet=Reports`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const result = await resp.json();
-                if (result.success) {
-                    if (statusDiv) statusDiv.innerHTML = `<span style="color: #4ade80;">✅ Connected! Found ${(result.data || []).length} reports in sheet.</span>`;
+                if (Array.isArray(result)) {
+                    if (statusDiv) statusDiv.innerHTML = `<span style="color: #4ade80;">✅ Connected! Found ${result.length} reports in sheet.</span>`;
                 } else {
-                    if (statusDiv) statusDiv.innerHTML = `<span style="color: #f87171;">❌ Error: ${result.error}</span>`;
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f87171;">❌ Unexpected response. Check your Sheet has a "Reports" tab with headers.</span>';
                 }
             } catch (err) {
                 if (statusDiv) statusDiv.innerHTML = `<span style="color: #f87171;">❌ Connection failed: ${err.message}</span>`;

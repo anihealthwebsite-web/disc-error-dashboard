@@ -426,14 +426,14 @@
         <div class="modal-content" style="max-width: 500px;">
             <h3>Google Sheets Host Settings</h3>
             <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 1rem;">
-                Host reports and store uploaded photos with in-cell images directly inside Google Sheets.
+                Host reports in Google Sheets via SheetDB. Photos are uploaded to Supabase Storage and the URLs are stored in the Sheet.
             </p>
             <div class="form-group">
-                <label for="input-sheets-url">Google Apps Script Web App URL</label>
-                <input type="text" id="input-sheets-url" placeholder="https://script.google.com/macros/s/.../exec">
+                <label for="input-sheets-url">SheetDB API URL</label>
+                <input type="text" id="input-sheets-url" placeholder="https://sheetdb.io/api/v1/your-api-id">
             </div>
             <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 1rem;">
-                Follow the <code>google-apps-script/Code.gs</code> instructions to create and deploy your Apps Script.
+                Go to <a href="https://sheetdb.io" target="_blank" style="color: #60a5fa;">sheetdb.io</a>, connect your Google Sheet, and paste the API URL above.
             </div>
             <div id="sheets-config-status" style="font-size: 0.85rem; margin-bottom: 1rem;"></div>
             <div class="modal-actions">
