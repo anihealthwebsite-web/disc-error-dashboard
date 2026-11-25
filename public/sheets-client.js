@@ -92,6 +92,9 @@ async function createReportInSheets(reportData, imageUrl) {
         ? reportData.abnormalities.join('; ')
         : (reportData.abnormalities || '');
 
+    const firstUrl = (imageUrl || '').split(',')[0].trim();
+    const isImage = firstUrl && !/\.(pdf|doc|docx|txt|csv|xlsx)$/i.test(firstUrl);
+
     const sheetRow = {
         id: id,
         created_at: timestamp,
@@ -109,6 +112,7 @@ async function createReportInSheets(reportData, imageUrl) {
         abnormalities: anomaliesStr,
         staff_name: reportData.staff_name || '',
         image_url: imageUrl || '',
+        image_preview: isImage ? `=IMAGE("${firstUrl}")` : '',
         do_number: reportData.do_number || '',
         release_date: reportData.release_date || ''
     };
