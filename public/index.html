@@ -52,8 +52,9 @@
                         <button id="logout-btn" class="btn-secondary btn-small">Logout</button>
                     </div>
                     <span class="divider">|</span>
-                    <span class="status-indicator online"></span>
-                    <span>System Online</span>
+                    <span class="status-indicator online" id="backend-indicator"></span>
+                    <span id="backend-status-text">System Online</span>
+                    <button id="sheets-config-btn" class="btn-secondary btn-small" style="margin-left: 8px;">📊 Host Settings</button>
                     <span class="time-display" id="clock">--:--:--</span>
                 </div>
             </header>
@@ -420,11 +421,35 @@
             </div>
         </div>
     </div>
+    <!-- Host Configuration Modal -->
+    <div id="sheets-config-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>Google Sheets Host Settings</h3>
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 1rem;">
+                Host reports and store uploaded photos with in-cell images directly inside Google Sheets.
+            </p>
+            <div class="form-group">
+                <label for="input-sheets-url">Google Apps Script Web App URL</label>
+                <input type="text" id="input-sheets-url" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 1rem;">
+                Follow the <code>google-apps-script/Code.gs</code> instructions to create and deploy your Apps Script.
+            </div>
+            <div id="sheets-config-status" style="font-size: 0.85rem; margin-bottom: 1rem;"></div>
+            <div class="modal-actions">
+                <button type="button" id="close-sheets-config" class="btn-secondary">Close</button>
+                <button type="button" id="test-sheets-config" class="btn-secondary">Test Connection</button>
+                <button type="button" id="save-sheets-config" class="btn-primary">Save & Connect</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS Library for Excel Export -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <!-- Removed obsolete supabase-client.js to prevent global const collision -->
+    <!-- Google Sheets Client -->
+    <script src="sheets-client.js"></script>
     <script src="app.js"></script>
 </body>
 

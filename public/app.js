@@ -41,25 +41,48 @@ let currentFile = null;
 let currentUser = null;
 let cachedClinics = {};
 
+// --- BACKEND HOST SELECTION (Google Sheets / Supabase) ---
+function getActiveBackend() {
+    if (typeof isGoogleSheetsConfigured === 'function' && isGoogleSheetsConfigured()) {
+        return 'google_sheets';
+    }
+    return 'supabase';
+}
+
+function updateBackendStatusUI() {
+    const indicator = document.getElementById('backend-indicator');
+    const statusText = document.getElementById('backend-status-text');
+    if (!indicator || !statusText) return;
+
+    if (getActiveBackend() === 'google_sheets') {
+        indicator.className = 'status-indicator online';
+        statusText.textContent = 'Host: Google Sheets';
+    } else if (_supabase) {
+        indicator.className = 'status-indicator online';
+        statusText.textContent = 'Host: Supabase';
+    } else {
+        indicator.className = 'status-indicator offline';
+        statusText.textContent = 'No Host Connected';
+    }
+}
+
 // --- 3. INITIALIZATION ---
 
-// Using 'load' instead of 'DOMContentLoaded' to ensure all external scripts (Supabase) are fully ready
+// Using 'load' instead of 'DOMContentLoaded' to ensure all external scripts are fully ready
 window.addEventListener('load', async () => {
-    console.log("🚀 App Initializing... v8-Auth (Window Load)");
+    console.log("🚀 App Initializing... (Window Load)");
 
-    // A. Initialize Supabase (First Priority)
+    // A. Initialize Supabase if available
     try {
-        if (!window.supabase) {
-            console.error("❌ Supabase SDK NOT found on window.load");
-            throw new Error("Supabase SDK missing");
+        if (window.supabase && APP_SUPABASE_URL && APP_SUPABASE_ANON_KEY) {
+            _supabase = window.supabase.createClient(APP_SUPABASE_URL, APP_SUPABASE_ANON_KEY);
+            console.log("✅ Supabase Connected (Safe Mode)");
         }
-        _supabase = window.supabase.createClient(APP_SUPABASE_URL, APP_SUPABASE_ANON_KEY);
-        console.log("✅ Supabase Connected (Safe Mode)");
     } catch (err) {
-        console.error("Init Error:", err);
-        alert("System Error: Database connection failed. Please refresh.");
-        return;
+        console.warn("Supabase Init Note:", err);
     }
+
+    updateBackendStatusUI();
 
     // B. Check Session (Now safe to load data)
     checkSession();
@@ -67,6 +90,7 @@ window.addEventListener('load', async () => {
     // C. Setup Listeners
     setupAuthListeners();
     setupAppListeners();
+    setupSheetsConfigListeners();
 
     // D. Load Clinic List
     loadClinics();
@@ -88,19 +112,26 @@ async function loadClinics() {
     if (!list1) return;
 
     try {
-        const { data, error } = await _supabase
-            .from('clinics')
-            .select('clinic_name, machine_serial')
-            .order('clinic_name', { ascending: true });
+        let clinics = [];
 
-        if (error) throw error;
+        if (getActiveBackend() === 'google_sheets' && typeof fetchClinicsFromSheets === 'function') {
+            clinics = await fetchClinicsFromSheets();
+        } else if (_supabase) {
+            const { data, error } = await _supabase
+                .from('clinics')
+                .select('clinic_name, machine_serial')
+                .order('clinic_name', { ascending: true });
+
+            if (error) throw error;
+            clinics = data || [];
+        }
         
         cachedClinics = {};
         list1.innerHTML = '';
         if (list2) list2.innerHTML = '';
 
-        if (data && data.length > 0) {
-            data.forEach(clinic => {
+        if (clinics && clinics.length > 0) {
+            clinics.forEach(clinic => {
                 cachedClinics[clinic.clinic_name] = clinic.machine_serial;
                 
                 const opt1 = document.createElement('option');
@@ -147,31 +178,32 @@ async function saveClinicIfNeeded(clinicName, machineSerial) {
     // Only save if it's not in cache or if the serial has changed
     if (!cachedClinics[clinicName] || cachedClinics[clinicName] !== machineSerial) {
         try {
-            const { error } = await _supabase
-                .from('clinics')
-                .upsert([{ clinic_name: clinicName, machine_serial: machineSerial }], { onConflict: 'clinic_name' });
-            
-            if (!error) {
-                // Update local cache and datalists to instantly reflect it
-                if (!cachedClinics[clinicName]) {
-                    const dl1 = document.getElementById('clinic-list');
-                    if (dl1) {
-                        const opt = document.createElement('option');
-                        opt.value = clinicName;
-                        dl1.appendChild(opt);
-                    }
-                    const dl2 = document.getElementById('edit-clinic-list');
-                    if (dl2) {
-                        const opt = document.createElement('option');
-                        opt.value = clinicName;
-                        dl2.appendChild(opt);
-                    }
-                }
-                cachedClinics[clinicName] = machineSerial;
-                console.log("Clinic auto-saved to database.");
-            } else {
-                console.warn("Failed to auto-save clinic to database:", error.message);
+            if (getActiveBackend() === 'google_sheets' && typeof saveClinicToSheets === 'function') {
+                await saveClinicToSheets(clinicName, machineSerial);
+            } else if (_supabase) {
+                const { error } = await _supabase
+                    .from('clinics')
+                    .upsert([{ clinic_name: clinicName, machine_serial: machineSerial }], { onConflict: 'clinic_name' });
+                if (error) console.warn("Supabase clinic upsert note:", error.message);
             }
+
+            // Update local cache and datalists to instantly reflect it
+            if (!cachedClinics[clinicName]) {
+                const dl1 = document.getElementById('clinic-list');
+                if (dl1) {
+                    const opt = document.createElement('option');
+                    opt.value = clinicName;
+                    dl1.appendChild(opt);
+                }
+                const dl2 = document.getElementById('edit-clinic-list');
+                if (dl2) {
+                    const opt = document.createElement('option');
+                    opt.value = clinicName;
+                    dl2.appendChild(opt);
+                }
+            }
+            cachedClinics[clinicName] = machineSerial;
+            console.log("Clinic auto-saved to backend.");
         } catch (err) {
             console.error("Error auto-saving clinic:", err);
         }
@@ -468,11 +500,6 @@ async function handleFormSubmit(e) {
             throw new Error("Validation Failed");
         }
 
-        let imageUrl = null;
-        if (currentFile && currentFile.length > 0) {
-            imageUrl = await uploadMultipleFiles(currentFile);
-        }
-
         const payload = {
             claim_type: claimType,
             product_line: productLine,
@@ -486,15 +513,27 @@ async function handleFormSubmit(e) {
             report_date: reportDate,
             abnormalities: abnormalities,
             staff_name: staffName,
-            image_url: imageUrl,
             status: 'Pending'
         };
 
-        const { error } = await _supabase
-            .from('report') // Singular
-            .insert([payload]);
+        if (getActiveBackend() === 'google_sheets' && typeof createReportInSheets === 'function') {
+            // Google Sheets: send files as base64 for in-cell image embedding
+            const result = await createReportInSheets(payload, currentFile || []);
+            payload.image_url = result.image_url || '';
+        } else {
+            // Supabase path
+            let imageUrl = null;
+            if (currentFile && currentFile.length > 0) {
+                imageUrl = await uploadMultipleFiles(currentFile);
+            }
+            payload.image_url = imageUrl;
 
-        if (error) throw error;
+            const { error } = await _supabase
+                .from('report')
+                .insert([payload]);
+
+            if (error) throw error;
+        }
 
         // Auto-save the clinic & serial for future dropdown use
         await saveClinicIfNeeded(clinicName, machineSerial);
@@ -522,12 +561,19 @@ async function handleExport() {
     btn.disabled = true;
 
     try {
-        const { data, error } = await _supabase
-            .from('report')
-            .select('*')
-            .order('created_at', { ascending: false });
+        let data = [];
 
-        if (error) throw error;
+        if (getActiveBackend() === 'google_sheets' && typeof fetchReportsFromSheets === 'function') {
+            data = await fetchReportsFromSheets();
+        } else {
+            const result = await _supabase
+                .from('report')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (result.error) throw result.error;
+            data = result.data;
+        }
 
         if (!data || data.length === 0) {
             alert("No data to export.");
@@ -629,9 +675,9 @@ async function uploadMultipleFiles(files) {
 async function loadWorklist() {
     const list = document.getElementById('report-list');
 
-    if (!_supabase) {
-        console.warn("⚠️ Supabase Client NOT ready during loadWorklist call.");
-        if (list) list.innerHTML = '<div class="empty-state" style="color:red">Database not connected</div>';
+    if (getActiveBackend() !== 'google_sheets' && !_supabase) {
+        console.warn("⚠️ No backend connected during loadWorklist call.");
+        if (list) list.innerHTML = '<div class="empty-state" style="color:red">No backend connected. Configure Google Sheets or check Supabase.</div>';
         return;
     }
 
@@ -644,20 +690,28 @@ async function loadWorklist() {
             </div>`;
     }
 
-    const { data, error } = await _supabase
-        .from('report')
-        .select('*')
-        .order('created_at', { ascending: false });
+    try {
+        let data = [];
 
-    if (error) {
-        console.error("Fetch Error:", error);
-        if (list) list.innerHTML = `<div class="empty-state" style="color:red">Error: ${error.message}</div>`;
-        return;
-    }
+        if (getActiveBackend() === 'google_sheets' && typeof fetchReportsFromSheets === 'function') {
+            data = await fetchReportsFromSheets();
+        } else {
+            const result = await _supabase
+                .from('report')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    if (data) {
-        allReports = data; // Cache for edit
-        applyWorklistFilter(); // Filter and render
+            if (result.error) throw result.error;
+            data = result.data || [];
+        }
+
+        if (data) {
+            allReports = data; // Cache for edit
+            applyWorklistFilter(); // Filter and render
+        }
+    } catch (err) {
+        console.error("Fetch Error:", err);
+        if (list) list.innerHTML = `<div class="empty-state" style="color:red">Error: ${err.message}</div>`;
     }
 }
 
@@ -1008,8 +1062,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("Update Payload:", payload);
 
             try {
-                const { error } = await _supabase.from('report').update(payload).eq('id', editingReport.id);
-                if (error) throw error;
+                if (getActiveBackend() === 'google_sheets' && typeof updateReportInSheets === 'function') {
+                    await updateReportInSheets(editingReport.id, payload);
+                } else {
+                    const { error } = await _supabase.from('report').update(payload).eq('id', editingReport.id);
+                    if (error) throw error;
+                }
 
                 // Auto-save the clinic & serial for future dropdown use
                 await saveClinicIfNeeded(payload.clinic_name, payload.machine_serial);
@@ -1067,16 +1125,22 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmBtn.disabled = true;
 
             try {
-                const { error } = await _supabase
-                    .from('report')
-                    .update({
-                        status: 'Completed',
-                        do_number: doNum,
-                        release_date: releaseDate
-                    })
-                    .eq('id', selectedReportId);
+                const completionUpdates = {
+                    status: 'Completed',
+                    do_number: doNum,
+                    release_date: releaseDate
+                };
 
-                if (error) throw error;
+                if (getActiveBackend() === 'google_sheets' && typeof updateReportInSheets === 'function') {
+                    await updateReportInSheets(selectedReportId, completionUpdates);
+                } else {
+                    const { error } = await _supabase
+                        .from('report')
+                        .update(completionUpdates)
+                        .eq('id', selectedReportId);
+
+                    if (error) throw error;
+                }
 
                 modal.classList.add('hidden');
                 document.getElementById('do-number').value = '';
@@ -1093,3 +1157,81 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// --- GOOGLE SHEETS HOST CONFIGURATION UI ---
+
+function setupSheetsConfigListeners() {
+    const configBtn = document.getElementById('sheets-config-btn');
+    const configModal = document.getElementById('sheets-config-modal');
+    const closeBtn = document.getElementById('close-sheets-config');
+    const testBtn = document.getElementById('test-sheets-config');
+    const saveBtn = document.getElementById('save-sheets-config');
+    const urlInput = document.getElementById('input-sheets-url');
+    const statusDiv = document.getElementById('sheets-config-status');
+
+    if (!configBtn || !configModal) return;
+
+    // Open modal
+    configBtn.addEventListener('click', () => {
+        if (urlInput && typeof GOOGLE_SCRIPT_URL !== 'undefined') {
+            urlInput.value = GOOGLE_SCRIPT_URL || '';
+        }
+        if (statusDiv) statusDiv.innerHTML = '';
+        configModal.classList.remove('hidden');
+    });
+
+    // Close modal
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            configModal.classList.add('hidden');
+        });
+    }
+
+    // Test connection
+    if (testBtn) {
+        testBtn.addEventListener('click', async () => {
+            const url = urlInput ? urlInput.value.trim() : '';
+            if (!url || !url.startsWith('https://script.google.com')) {
+                if (statusDiv) statusDiv.innerHTML = '<span style="color: #f87171;">❌ Invalid URL. Must start with https://script.google.com</span>';
+                return;
+            }
+            if (statusDiv) statusDiv.innerHTML = '<span style="color: #94a3b8;">⏳ Testing connection...</span>';
+
+            try {
+                const resp = await fetch(`${url}?action=getReports&t=${Date.now()}`);
+                const result = await resp.json();
+                if (result.success) {
+                    if (statusDiv) statusDiv.innerHTML = `<span style="color: #4ade80;">✅ Connected! Found ${(result.data || []).length} reports in sheet.</span>`;
+                } else {
+                    if (statusDiv) statusDiv.innerHTML = `<span style="color: #f87171;">❌ Error: ${result.error}</span>`;
+                }
+            } catch (err) {
+                if (statusDiv) statusDiv.innerHTML = `<span style="color: #f87171;">❌ Connection failed: ${err.message}</span>`;
+            }
+        });
+    }
+
+    // Save and connect
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const url = urlInput ? urlInput.value.trim() : '';
+            if (typeof setGoogleScriptUrl === 'function') {
+                setGoogleScriptUrl(url);
+            }
+            updateBackendStatusUI();
+            configModal.classList.add('hidden');
+
+            if (url) {
+                // Reload data from Google Sheets
+                loadClinics();
+                loadWorklist();
+                alert("✅ Google Sheets host connected! Reports will now sync with your Sheet.");
+            } else {
+                // Switched back to Supabase
+                loadClinics();
+                loadWorklist();
+                alert("Switched back to Supabase backend.");
+            }
+        });
+    }
+}
