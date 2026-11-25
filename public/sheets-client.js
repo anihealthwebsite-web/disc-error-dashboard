@@ -163,6 +163,8 @@ async function updateReportInSheets(reportId, updates) {
 // CLINICS
 // ========================================
 
+let clinicsSheetKeys = { nameKey: 'clinic_name', serialKey: 'machine_serial' };
+
 /**
  * Fetch clinics from the Clinics sheet via SheetDB
  */
@@ -174,9 +176,19 @@ async function fetchClinicsFromSheets() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const rows = await response.json();
 
+        if (Array.isArray(rows) && rows.length > 0) {
+            const first = rows[0];
+            if ('Clinic Name' in first || 'Serial Number' in first) {
+                clinicsSheetKeys = {
+                    nameKey: 'Clinic Name' in first ? 'Clinic Name' : 'clinic_name',
+                    serialKey: 'Serial Number' in first ? 'Serial Number' : 'machine_serial'
+                };
+            }
+        }
+
         return (rows || []).map(row => ({
-            clinic_name: (row.clinic_name || '').trim(),
-            machine_serial: (row.machine_serial || '').trim()
+            clinic_name: (row.clinic_name || row['Clinic Name'] || '').trim(),
+            machine_serial: (row.machine_serial || row['Serial Number'] || row.serial_number || '').trim()
         })).filter(c => c.clinic_name);
     } catch (err) {
         console.error('Error fetching clinics from SheetDB:', err);
@@ -198,10 +210,10 @@ async function saveClinicToSheets(clinicName, machineSerial) {
         if (found) {
             // Update serial if changed
             if (machineSerial && found.machine_serial !== machineSerial) {
-                await fetch(`${SHEETDB_API_URL}/clinic_name/${encodeURIComponent(clinicName)}?sheet=Clinics`, {
+                await fetch(`${SHEETDB_API_URL}/${encodeURIComponent(clinicsSheetKeys.nameKey)}/${encodeURIComponent(clinicName)}?sheet=Clinics`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { machine_serial: machineSerial } })
+                    body: JSON.stringify({ data: { [clinicsSheetKeys.serialKey]: machineSerial } })
                 });
             }
         } else {
@@ -209,7 +221,12 @@ async function saveClinicToSheets(clinicName, machineSerial) {
             await fetch(`${SHEETDB_API_URL}?sheet=Clinics`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: [{ clinic_name: clinicName, machine_serial: machineSerial || '' }] })
+                body: JSON.stringify({
+                    data: [{
+                        [clinicsSheetKeys.nameKey]: clinicName,
+                        [clinicsSheetKeys.serialKey]: machineSerial || ''
+                    }]
+                })
             });
         }
     } catch (err) {
