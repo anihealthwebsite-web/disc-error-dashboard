@@ -621,8 +621,8 @@ async function handleExport(isMindray = false) {
         // Generate Filename
         const dateStr = new Date().toISOString().split('T')[0];
         const filename = isMindray
-            ? `Mindray_Claim_Export_${dateStr}.csv`
-            : `BioChem_Reports_${dateStr}.csv`;
+            ? `Mindray_Claim_Export_${dateStr}.xlsx`
+            : `BioChem_Reports_${dateStr}.xlsx`;
 
         // Create Workbook & Download
         const ws = XLSX.utils.json_to_sheet(rows);
