@@ -420,7 +420,12 @@ function setupAppListeners() {
     // 3. Export
     const exportBtn = document.getElementById('export-btn');
     if (exportBtn) {
-        exportBtn.addEventListener('click', handleExport);
+        exportBtn.addEventListener('click', () => handleExport(false));
+    }
+
+    const mindrayExportBtn = document.getElementById('mindray-export-btn');
+    if (mindrayExportBtn) {
+        mindrayExportBtn.addEventListener('click', () => handleExport(true));
     }
 }
 
@@ -484,6 +489,8 @@ async function handleFormSubmit(e) {
         const expiryDate = document.getElementById('disc-expiry').value;
         const errorDate = document.getElementById('error-date').value;
         const reportDate = document.getElementById('report-date').value;
+        const abnormalParamEl = document.getElementById('abnormal-parameter');
+        const abnormalParameter = abnormalParamEl ? abnormalParamEl.value.trim() : '';
 
         let abnormalities = Array.from(document.querySelectorAll('input[name="anomalies"]:checked'))
             .filter(cb => cb.value !== 'Others')
@@ -512,6 +519,8 @@ async function handleFormSubmit(e) {
             error_date: errorDate,
             report_date: reportDate,
             abnormalities: abnormalities,
+            abnormal_parameter: abnormalParameter,
+            claimed_quantity: 1,
             staff_name: staffName,
             status: 'Pending'
         };
@@ -557,11 +566,13 @@ async function handleFormSubmit(e) {
     }
 }
 
-async function handleExport() {
-    const btn = document.getElementById('export-btn');
-    const originalText = btn.textContent;
-    btn.textContent = "Exporting...";
-    btn.disabled = true;
+async function handleExport(isMindray = false) {
+    const btn = document.getElementById(isMindray ? 'mindray-export-btn' : 'export-btn');
+    const originalText = btn ? btn.textContent : 'Export';
+    if (btn) {
+        btn.textContent = "Exporting...";
+        btn.disabled = true;
+    }
 
     try {
         let data = [];
@@ -583,29 +594,35 @@ async function handleExport() {
             return;
         }
 
-        // Format Data — columns match the target Excel layout
-        const rows = data.map(item => ({
-            "Claim Type":             item.claim_type || '',
-            "Hospital Name":          item.clinic_name || '',
-            "City":                   '',
-            "Product Line":           item.product_line || '',
-            "Instrument Model":       item.instrument_model || '',
-            "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
-            "Claim Item":             item.disc_type || '',
-            "Reagent LOT":            item.lot_number || '',
-            "Claimed Cause":          (item.abnormalities || []).join(", "),
-            "Attachment":             '',
-            "Claimed Quantity (pcs)": '',
-            "Test Date":              item.error_date || '',
-            "Sample ID":              '',
-            "Abnormal Parameter":     (item.abnormalities || []).join(", "),
-            "Salesperson":            item.staff_name || '',
-            "Image URL":              item.image_url || ''
-        }));
+        // Format Data — columns match requested order
+        const rows = data.map(item => {
+            const row = {
+                "Claim Type":             item.claim_type || '',
+                "Hospital Name":          isMindray ? '' : (item.clinic_name || ''),
+                "City":                   '',
+                "Product Line":           item.product_line || '',
+                "Instrument Model":       item.instrument_model || '',
+                "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
+                "Claimed Cause":          (item.abnormalities || []).join(", "),
+                "Attachment":             item.image_url || '',
+                "Claimed Quantity(pcs)":  item.claimed_quantity || 1,
+                "Test Date":              item.error_date || '',
+                "Sample ID*":             '',
+                "Abnormal Parameter*":    item.abnormal_parameter || ''
+            };
 
-        // Generate Filename: BioChem_Reports_YYYY-MM-DD.csv
+            if (!isMindray) {
+                row["Salesperson"] = item.staff_name || '';
+            }
+
+            return row;
+        });
+
+        // Generate Filename
         const dateStr = new Date().toISOString().split('T')[0];
-        const filename = `BioChem_Reports_${dateStr}.csv`;
+        const filename = isMindray
+            ? `Mindray_Claim_Export_${dateStr}.csv`
+            : `BioChem_Reports_${dateStr}.csv`;
 
         // Create Workbook & Download
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -617,8 +634,10 @@ async function handleExport() {
         console.error("Export Failed:", err);
         alert("Failed to export data: " + err.message);
     } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
     }
 }
 

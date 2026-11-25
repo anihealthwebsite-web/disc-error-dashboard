@@ -67,7 +67,7 @@
                     </div>
                     <div class="card-content">
                         <form id="report-form">
-                            <!-- Row 1: Claim Type + Product Line -->
+                            <!-- Row 1: Claim Type + Hospital Name -->
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="claim-type">Claim Type</label>
@@ -78,6 +78,15 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
+                                    <label for="clinic-name">Hospital Name</label>
+                                    <input type="text" id="clinic-name" list="clinic-list" placeholder="Select or type hospital name" required autocomplete="off">
+                                    <datalist id="clinic-list"></datalist>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Product Line + Instrument Model -->
+                            <div class="form-row">
+                                <div class="form-group">
                                     <label for="product-line">Product Line</label>
                                     <select id="product-line" required>
                                         <option value="" disabled selected>Select Product Line</option>
@@ -85,31 +94,22 @@
                                         <option value="Immunoassay">Immunoassay</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <!-- Row 2: Clinic Name + Serial -->
-                            <div class="form-row">
                                 <div class="form-group">
-                                    <label for="clinic-name">Hospital Name</label>
-                                    <input type="text" id="clinic-name" list="clinic-list" placeholder="Select or type clinic name" required autocomplete="off">
-                                    <datalist id="clinic-list"></datalist>
-                                </div>
-                                <div class="form-group">
-                                    <label for="machine-serial">Instrument Serial No.</label>
-                                    <input type="text" id="machine-serial" placeholder="Auto-filled from clinic — editable if needed">
+                                    <label for="instrument-model">Instrument Model</label>
+                                    <select id="instrument-model" required>
+                                        <option value="" disabled selected>Select Instrument Model</option>
+                                        <option value="VetXpert Cube">VetXpert Cube</option>
+                                        <option value="VetXpert C5">VetXpert C5</option>
+                                        <option value="VetXpert I3">VetXpert I3</option>
+                                        <option value="Vetube30">Vetube30</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <!-- Instrument Model -->
+                            <!-- Instrument Serial No. -->
                             <div class="form-group">
-                                <label for="instrument-model">Instrument Model</label>
-                                <select id="instrument-model" required>
-                                    <option value="" disabled selected>Select Instrument Model</option>
-                                    <option value="VetXpert Cube">VetXpert Cube</option>
-                                    <option value="VetXpert C5">VetXpert C5</option>
-                                    <option value="VetXpert I3">VetXpert I3</option>
-                                    <option value="Vetube30">Vetube30</option>
-                                </select>
+                                <label for="machine-serial">Instrument Serial No.</label>
+                                <input type="text" id="machine-serial" placeholder="Auto-filled from hospital — editable if needed">
                             </div>
 
                             <!-- Claim Item (Disc Type) -->
@@ -169,10 +169,30 @@
                                 </div>
                             </div>
 
-                            <!-- Dates -->
+                            <!-- Claimed Cause -->
+                            <div class="form-group">
+                                <label>Claimed Cause (Select all that apply)</label>
+                                <div class="checkbox-group" id="anomaly-checkboxes">
+                                    <!-- JS will populate this -->
+                                </div>
+                            </div>
+
+                            <!-- Attachment -->
+                            <div class="form-group">
+                                <label>Attachment</label>
+                                <div class="file-upload-wrapper">
+                                    <div class="file-upload-ui">
+                                        <span id="file-label">Choose File(s)...</span>
+                                        <input type="file" id="disc-photo" accept="image/*, .pdf, .doc, .docx" multiple>
+                                    </div>
+                                    <div id="image-preview" class="hidden"></div>
+                                </div>
+                            </div>
+
+                            <!-- Test Date + Date Reported -->
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="error-date">Date of Error</label>
+                                    <label for="error-date">Test Date</label>
                                     <input type="date" id="error-date" required>
                                 </div>
                                 <div class="form-group">
@@ -181,28 +201,16 @@
                                 </div>
                             </div>
 
+                            <!-- Abnormal Parameter* (Optional) -->
                             <div class="form-group">
-                                <label>Anomalies Observed (Select all that apply)</label>
-                                <div class="checkbox-group" id="anomaly-checkboxes">
-                                    <!-- JS will populate this -->
-                                </div>
+                                <label for="abnormal-parameter">Abnormal Parameter* (Optional)</label>
+                                <input type="text" id="abnormal-parameter" placeholder="Optional (e.g. ALT, GLU, CREA)">
                             </div>
 
                             <!-- Salesperson -->
                             <div class="form-group">
                                 <label for="sales-person">Salesperson</label>
                                 <input type="text" id="sales-person" placeholder="Enter name" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Upload Photo / Attachment</label>
-                                <div class="file-upload-wrapper">
-                                    <div class="file-upload-ui">
-                                        <span id="file-label">Choose File(s)...</span>
-                                        <input type="file" id="disc-photo" accept="image/*, .pdf, .doc, .docx" multiple>
-                                    </div>
-                                    <div id="image-preview" class="hidden"></div>
-                                </div>
                             </div>
 
                             <button type="submit" class="btn-primary">Submit Report</button>
@@ -237,6 +245,7 @@
                             <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.2);"></div>
                             <span class="badge" id="active-count">0 Active</span>
                             <button id="export-btn" class="btn-primary btn-small">Export</button>
+                            <button id="mindray-export-btn" class="btn-secondary btn-small">Mindray Claim Export</button>
                         </div>
                     </div>
                     <div class="card-content scrollable">
