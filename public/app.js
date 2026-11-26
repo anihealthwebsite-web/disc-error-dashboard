@@ -601,6 +601,34 @@ function openExportModal(isMindray = false) {
     }
 }
 
+async function fetchImageForExcel(url) {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+    const buffer = await resp.arrayBuffer();
+
+    if (contentType.includes('png') || /\.png(\?|$)/i.test(url)) {
+        return { buffer, extension: 'png' };
+    }
+    if (contentType.includes('jpeg') || contentType.includes('jpg') || /\.(jpe?g)(\?|$)/i.test(url)) {
+        return { buffer, extension: 'jpeg' };
+    }
+    if (contentType.includes('gif') || /\.gif(\?|$)/i.test(url)) {
+        return { buffer, extension: 'gif' };
+    }
+
+    // Fallback: convert other image formats (e.g. webp) to PNG via canvas
+    const blob = new Blob([buffer], { type: contentType || 'image/png' });
+    const imgBitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = imgBitmap.width;
+    canvas.height = imgBitmap.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgBitmap, 0, 0);
+    const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    return { buffer: await pngBlob.arrayBuffer(), extension: 'png' };
+}
+
 async function handleExport(isMindray = false, dateField = 'error_date', startDate = '', endDate = '') {
     const confirmBtn = document.getElementById('confirm-export');
     const originalText = confirmBtn ? confirmBtn.textContent : 'Download .xlsx';
@@ -648,45 +676,109 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
         // Sort oldest-to-newest so Process No. increases sequentially
         const ordered = [...data].reverse();
 
-        // Format Data — Process No. first, followed by requested columns
-        const rows = ordered.map((item, index) => {
-            const row = {
-                "Process No.":            item.process_no || (index + 1),
-                "Claim Type":             item.claim_type || '',
-                "Hospital Name":          isMindray ? '' : (item.clinic_name || ''),
-                "City":                   '',
-                "Product Line":           item.product_line || '',
-                "Instrument Model":       item.instrument_model || '',
-                "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
-                "Claim Item":             item.disc_type || '',
-                "Reagent LOT":            item.lot_number || '',
-                "Sample ID*":             '',
-                "Test Date":              item.error_date || '',
-                "Abnormal Parameter*":    item.abnormal_parameter || '',
-                "Claimed Cause":          (item.abnormalities || []).join(", "),
-                "Claimed Quantity (pcs)": item.claimed_quantity || 1,
-                "Attachment":             item.image_url || ''
-            };
+        const headers = [
+            "Process No.",
+            "Claim Type",
+            "Hospital Name",
+            "City",
+            "Product Line",
+            "Instrument Model",
+            "Instrument Serial No.",
+            "Claim Item",
+            "Reagent LOT",
+            "Sample ID*",
+            "Test Date",
+            "Abnormal Parameter*",
+            "Claimed Cause",
+            "Claimed Quantity (pcs)",
+            "Attachment"
+        ];
+        if (!isMindray) {
+            headers.push("Salesperson");
+        }
 
-            if (!isMindray) {
-                row["Salesperson"] = item.staff_name || '';
-            }
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Reports");
 
-            return row;
+        // Add Header Row
+        worksheet.addRow(headers);
+        worksheet.getRow(1).font = { bold: true };
+
+        // Set column widths
+        const attachmentColIdx = headers.indexOf("Attachment"); // 0-indexed (14)
+        headers.forEach((h, idx) => {
+            const col = worksheet.getColumn(idx + 1);
+            if (h === "Attachment") col.width = 18;
+            else if (h === "Claimed Cause" || h === "Claim Item" || h === "Hospital Name") col.width = 26;
+            else if (h === "Process No.") col.width = 12;
+            else col.width = 18;
         });
 
-        // Generate Filename
+        // Add Data Rows + Embed Photos Directly in Attachment Cell
+        for (let i = 0; i < ordered.length; i++) {
+            const item = ordered[i];
+            const rowValues = [
+                item.process_no || (i + 1),
+                item.claim_type || '',
+                isMindray ? '' : (item.clinic_name || ''),
+                '',
+                item.product_line || '',
+                item.instrument_model || '',
+                item.machine_serial || cachedClinics[item.clinic_name] || '',
+                item.disc_type || '',
+                item.lot_number || '',
+                '',
+                item.error_date || '',
+                item.abnormal_parameter || '',
+                (item.abnormalities || []).join(", "),
+                item.claimed_quantity || 1,
+                '' // Keep Attachment cell text empty; photo is embedded in cell
+            ];
+            if (!isMindray) {
+                rowValues.push(item.staff_name || '');
+            }
+
+            const row = worksheet.addRow(rowValues);
+            const rowNumber = row.number; // 1-indexed
+
+            if (item.image_url) {
+                const urls = item.image_url.split(',').map(u => u.trim()).filter(Boolean);
+                const imageUrls = urls.filter(u => !/\.(pdf|doc|docx|txt|csv|xlsx)(\?|$)/i.test(u));
+
+                if (imageUrls.length > 0) {
+                    try {
+                        const { buffer, extension } = await fetchImageForExcel(imageUrls[0]);
+                        const imageId = workbook.addImage({ buffer, extension });
+                        row.height = 75;
+                        worksheet.addImage(imageId, {
+                            tl: { col: attachmentColIdx, row: rowNumber - 1 },
+                            ext: { width: 95, height: 70 },
+                            editAs: 'oneCell'
+                        });
+                    } catch (imgErr) {
+                        console.warn(`Could not embed image for row ${rowNumber}:`, imgErr);
+                    }
+                }
+            }
+        }
+
+        // Generate Filename & Download .xlsx
         const dateStr = new Date().toISOString().split('T')[0];
         const rangeSuffix = (startDate || endDate) ? `_${startDate || 'start'}_to_${endDate || 'end'}` : `_${dateStr}`;
         const filename = isMindray
             ? `Mindray_Claim_Export${rangeSuffix}.xlsx`
             : `BioChem_Reports${rangeSuffix}.xlsx`;
 
-        // Create Workbook & Download
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Reports");
-        XLSX.writeFile(wb, filename);
+        const outBuffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([outBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
 
         const exportModal = document.getElementById('export-modal');
         if (exportModal) exportModal.classList.add('hidden');
