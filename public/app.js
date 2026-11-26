@@ -751,8 +751,8 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
                         const imageId = workbook.addImage({ buffer, extension });
                         row.height = 75;
                         worksheet.addImage(imageId, {
-                            tl: { col: attachmentColIdx, row: rowNumber - 1 },
-                            ext: { width: 95, height: 70 },
+                            tl: { col: attachmentColIdx + 0.05, row: (rowNumber - 1) + 0.05 },
+                            br: { col: attachmentColIdx + 0.95, row: rowNumber - 0.05 },
                             editAs: 'oneCell'
                         });
                     } catch (imgErr) {
