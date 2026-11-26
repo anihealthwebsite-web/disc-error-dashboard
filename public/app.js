@@ -676,7 +676,23 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
         // Sort oldest-to-newest so Process No. increases sequentially
         const ordered = [...data].reverse();
 
-        const headers = [
+        const headers = isMindray ? [
+            "Process No.",
+            "Claim Type",
+            "City",
+            "Product Line",
+            "Instrument Model",
+            "Instrument Serial No.",
+            "Claim Item",
+            "Reagent LOT",
+            "Sample ID*",
+            "Test Date*",
+            "Abnormal Parameter*",
+            "Claimed Cause",
+            "Claimed Quantity (pcs)",
+            "Attachment",
+            "Hospital Name"
+        ] : [
             "Process No.",
             "Claim Type",
             "Hospital Name",
@@ -691,11 +707,9 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
             "Abnormal Parameter*",
             "Claimed Cause",
             "Claimed Quantity (pcs)",
-            "Attachment"
+            "Attachment",
+            "Salesperson"
         ];
-        if (!isMindray) {
-            headers.push("Salesperson");
-        }
 
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("Reports");
@@ -705,7 +719,7 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
         worksheet.getRow(1).font = { bold: true };
 
         // Set column widths
-        const attachmentColIdx = headers.indexOf("Attachment"); // 0-indexed (14)
+        const attachmentColIdx = headers.indexOf("Attachment"); // 0-indexed
         headers.forEach((h, idx) => {
             const col = worksheet.getColumn(idx + 1);
             if (h === "Attachment") col.width = 18;
@@ -717,26 +731,40 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
         // Add Data Rows + Embed Photos Directly in Attachment Cell
         for (let i = 0; i < ordered.length; i++) {
             const item = ordered[i];
-            const rowValues = [
+            const rowValues = isMindray ? [
                 item.process_no || (i + 1),
                 item.claim_type || '',
-                isMindray ? '' : (item.clinic_name || ''),
-                '',
+                '', // City (blank)
                 item.product_line || '',
                 item.instrument_model || '',
                 item.machine_serial || cachedClinics[item.clinic_name] || '',
                 item.disc_type || '',
                 item.lot_number || '',
-                '',
+                '', // Sample ID*
+                item.error_date || '', // Test Date*
+                item.abnormal_parameter || '',
+                (item.abnormalities || []).join(", "),
+                item.claimed_quantity || 1,
+                '', // Attachment (photo embedded in cell)
+                ''  // Hospital Name (blank in Mindray export)
+            ] : [
+                item.process_no || (i + 1),
+                item.claim_type || '',
+                item.clinic_name || '',
+                '', // City
+                item.product_line || '',
+                item.instrument_model || '',
+                item.machine_serial || cachedClinics[item.clinic_name] || '',
+                item.disc_type || '',
+                item.lot_number || '',
+                '', // Sample ID*
                 item.error_date || '',
                 item.abnormal_parameter || '',
                 (item.abnormalities || []).join(", "),
                 item.claimed_quantity || 1,
-                '' // Keep Attachment cell text empty; photo is embedded in cell
+                '', // Attachment (photo embedded in cell)
+                item.staff_name || ''
             ];
-            if (!isMindray) {
-                rowValues.push(item.staff_name || '');
-            }
 
             const row = worksheet.addRow(rowValues);
             const rowNumber = row.number; // 1-indexed
