@@ -658,12 +658,14 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
                 "Product Line":           item.product_line || '',
                 "Instrument Model":       item.instrument_model || '',
                 "Instrument Serial No.":  item.machine_serial || cachedClinics[item.clinic_name] || '',
-                "Claimed Cause":          (item.abnormalities || []).join(", "),
-                "Attachment":             item.image_url || '',
-                "Claimed Quantity(pcs)":  item.claimed_quantity || 1,
-                "Test Date":              item.error_date || '',
+                "Claim Item":             item.disc_type || '',
+                "Reagent LOT":            item.lot_number || '',
                 "Sample ID*":             '',
-                "Abnormal Parameter*":    item.abnormal_parameter || ''
+                "Test Date":              item.error_date || '',
+                "Abnormal Parameter*":    item.abnormal_parameter || '',
+                "Claimed Cause":          (item.abnormalities || []).join(", "),
+                "Claimed Quantity(pcs)":  item.claimed_quantity || 1,
+                "Attachment":             item.image_url || ''
             };
 
             if (!isMindray) {
