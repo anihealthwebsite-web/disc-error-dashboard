@@ -664,7 +664,7 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
                 "Test Date":              item.error_date || '',
                 "Abnormal Parameter*":    item.abnormal_parameter || '',
                 "Claimed Cause":          (item.abnormalities || []).join(", "),
-                "Claimed Quantity(pcs)":  item.claimed_quantity || 1,
+                "Claimed Quantity (pcs)": item.claimed_quantity || 1,
                 "Attachment":             item.image_url || ''
             };
 
