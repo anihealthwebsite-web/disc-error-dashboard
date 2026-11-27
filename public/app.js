@@ -432,6 +432,33 @@ function setupAppListeners() {
     const confirmExportBtn = document.getElementById('confirm-export');
     const exportModal = document.getElementById('export-modal');
 
+    // Worklist search, date filter, and select-all listeners
+    const wlSearch = document.getElementById('worklist-search');
+    const wlDateFrom = document.getElementById('wl-date-from');
+    const wlDateTo = document.getElementById('wl-date-to');
+    const wlClear = document.getElementById('wl-clear-filters');
+    const wlSelectAll = document.getElementById('wl-select-all');
+
+    if (wlSearch) wlSearch.addEventListener('input', applyWorklistFilter);
+    if (wlDateFrom) wlDateFrom.addEventListener('change', applyWorklistFilter);
+    if (wlDateTo) wlDateTo.addEventListener('change', applyWorklistFilter);
+    if (wlClear) {
+        wlClear.addEventListener('click', () => {
+            if (wlSearch) wlSearch.value = '';
+            if (wlDateFrom) wlDateFrom.value = '';
+            if (wlDateTo) wlDateTo.value = '';
+            selectedExportIds.clear();
+            if (wlSelectAll) wlSelectAll.checked = false;
+            updateSelectedCountUI();
+            applyWorklistFilter();
+        });
+    }
+    if (wlSelectAll) {
+        wlSelectAll.addEventListener('change', (e) => {
+            toggleSelectAllVisible(e.target.checked);
+        });
+    }
+
     if (cancelExportBtn && exportModal) {
         cancelExportBtn.addEventListener('click', () => {
             exportModal.classList.add('hidden');
@@ -586,14 +613,51 @@ async function handleFormSubmit(e) {
 }
 
 let pendingExportMindray = false;
+let selectedExportIds = new Set();
+let currentVisibleReports = [];
+
+function updateSelectedCountUI() {
+    const label = document.getElementById('wl-selected-count');
+    if (label) {
+        label.textContent = selectedExportIds.size > 0
+            ? `Selected (${selectedExportIds.size})`
+            : 'Select All';
+    }
+}
+
+window.toggleReportSelection = function (id, checked) {
+    const key = String(id);
+    if (checked) selectedExportIds.add(key);
+    else selectedExportIds.delete(key);
+    updateSelectedCountUI();
+};
+
+function toggleSelectAllVisible(checked) {
+    currentVisibleReports.forEach(item => {
+        const key = String(item.id);
+        if (checked) selectedExportIds.add(key);
+        else selectedExportIds.delete(key);
+    });
+    updateSelectedCountUI();
+    renderList(currentVisibleReports);
+}
 
 function openExportModal(isMindray = false) {
     pendingExportMindray = isMindray;
     const modal = document.getElementById('export-modal');
     const title = document.getElementById('export-modal-title');
     if (title) {
-        title.textContent = isMindray ? 'Mindray Claim Export (.xlsx)' : 'Export Reports (.xlsx)';
+        const suffix = selectedExportIds.size > 0 ? ` — ${selectedExportIds.size} Selected` : '';
+        title.textContent = (isMindray ? 'Mindray Claim Export (.xlsx)' : 'Export Reports (.xlsx)') + suffix;
     }
+    // Pre-fill modal dates from worklist date filter if set
+    const wlFrom = document.getElementById('wl-date-from')?.value || '';
+    const wlTo = document.getElementById('wl-date-to')?.value || '';
+    const expFrom = document.getElementById('export-start-date');
+    const expTo = document.getElementById('export-end-date');
+    if (expFrom && wlFrom && !expFrom.value) expFrom.value = wlFrom;
+    if (expTo && wlTo && !expTo.value) expTo.value = wlTo;
+
     if (modal) {
         modal.classList.remove('hidden');
     } else {
@@ -655,6 +719,15 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
         if (!data || data.length === 0) {
             alert("No data to export.");
             return;
+        }
+
+        // If user checked specific reports, export only those
+        if (selectedExportIds.size > 0) {
+            data = data.filter(item => selectedExportIds.has(String(item.id)));
+            if (data.length === 0) {
+                alert("None of the selected reports were found.");
+                return;
+            }
         }
 
         // Filter by selected date range if provided
@@ -745,7 +818,7 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
                 item.abnormal_parameter || '',
                 (item.abnormalities || []).join(", "),
                 item.claimed_quantity || 1,
-                '', // Attachment (photo embedded in cell)
+                isMindray ? 'self upload' : '', // Mindray uses "self upload"; regular export embeds photo in cell
                 ''  // Hospital Name (blank in Mindray export)
             ] : [
                 item.process_no || (i + 1),
@@ -769,7 +842,7 @@ async function handleExport(isMindray = false, dateField = 'error_date', startDa
             const row = worksheet.addRow(rowValues);
             const rowNumber = row.number; // 1-indexed
 
-            if (item.image_url) {
+            if (!isMindray && item.image_url) {
                 const urls = item.image_url.split(',').map(u => u.trim()).filter(Boolean);
                 const imageUrls = urls.filter(u => !/\.(pdf|doc|docx|txt|csv|xlsx)(\?|$)/i.test(u));
 
@@ -938,14 +1011,34 @@ window.applyWorklistFilter = function () {
         lblCompleted.style.fontWeight = '600';
     }
 
-    // Filter Logic
-    let filteredData = [];
-    if (filterValue === 'active') {
-        filteredData = allReports.filter(r => r.status === 'Pending');
-    } else {
-        filteredData = allReports.filter(r => r.status === 'Completed');
-    }
+    // Filter Logic: Status + Search (Clinic Name or DO #) + Date Range
+    const searchQuery = (document.getElementById('worklist-search')?.value || '').trim().toLowerCase();
+    const dateFrom = document.getElementById('wl-date-from')?.value || '';
+    const dateTo = document.getElementById('wl-date-to')?.value || '';
 
+    let filteredData = allReports.filter(r => {
+        const matchesStatus = filterValue === 'active'
+            ? r.status === 'Pending'
+            : r.status === 'Completed';
+        if (!matchesStatus) return false;
+
+        if (searchQuery) {
+            const clinicMatch = (r.clinic_name || '').toLowerCase().includes(searchQuery);
+            const doMatch = (r.do_number || '').toLowerCase().includes(searchQuery);
+            if (!clinicMatch && !doMatch) return false;
+        }
+
+        if (dateFrom || dateTo) {
+            const itemDate = (r.error_date || r.report_date || '').slice(0, 10);
+            if (!itemDate) return false;
+            if (dateFrom && itemDate < dateFrom) return false;
+            if (dateTo && itemDate > dateTo) return false;
+        }
+
+        return true;
+    });
+
+    currentVisibleReports = filteredData;
     renderList(filteredData);
 }
 
@@ -965,6 +1058,7 @@ function renderList(data) {
     }
 
     list.innerHTML = data.map(item => {
+        const isChecked = selectedExportIds.has(String(item.id)) ? 'checked' : '';
         const anomalyBadges = (item.abnormalities || []).map(text => {
             const match = text.match(/Disk anomaly (\d+)/);
             if (match) {
@@ -989,7 +1083,10 @@ function renderList(data) {
         return `
         <div class="report-card ${item.status === 'Completed' ? 'completed' : ''}">
             <div class="report-header">
-                <span class="clinic-name">${item.clinic_name || 'Unknown Clinic'}</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <input type="checkbox" class="report-select-cb" ${isChecked} onchange="toggleReportSelection('${item.id}', this.checked)" title="Select for export" style="width:16px; height:16px; cursor:pointer;">
+                    <span class="clinic-name">${item.clinic_name || 'Unknown Clinic'}</span>
+                </div>
                 <div style="text-align:right">
                     <div class="report-date">Reported: ${item.report_date}</div>
                     <div class="report-date">Error: ${item.error_date}</div>

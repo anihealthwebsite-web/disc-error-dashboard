@@ -248,6 +248,21 @@
                             <button id="mindray-export-btn" class="btn-secondary btn-small">Mindray Claim Export</button>
                         </div>
                     </div>
+                    <!-- Worklist Search & Date Filter Bar -->
+                    <div class="worklist-toolbar" style="padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; background: rgba(0,0,0,0.12);">
+                        <input type="text" id="worklist-search" placeholder="Search by clinic name or DO #..." style="flex: 1 1 200px; min-width: 180px; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; font-size: 0.85rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #cbd5e1;">
+                            <span>From:</span>
+                            <input type="date" id="wl-date-from" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; font-size: 0.8rem;">
+                            <span>To:</span>
+                            <input type="date" id="wl-date-to" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; font-size: 0.8rem;">
+                            <button type="button" id="wl-clear-filters" class="btn-secondary btn-small" style="padding: 4px 8px; font-size: 0.75rem;">Clear</button>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: #cbd5e1; cursor: pointer; margin-left: auto;">
+                            <input type="checkbox" id="wl-select-all">
+                            <span id="wl-selected-count">Select All</span>
+                        </label>
+                    </div>
                     <div class="card-content scrollable">
                         <div id="report-list" class="report-list">
                             <!-- Reports populated by JS -->
@@ -260,44 +275,6 @@
     </div>
 
     <!-- Login Modal Removed for Public Access -->
-
-    <!-- Export Options Modal -->
-    <div id="export-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Export Data</h3>
-            <p>Choose export format and data selection:</p>
-            <div class="form-group">
-                <label>Export Format</label>
-                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="export-format" value="xlsx" checked>
-                        <span>Excel (.xlsx)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="export-format" value="csv">
-                        <span>CSV</span>
-                    </label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Records to Export</label>
-                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="export-filter" value="all" checked>
-                        <span>All Records</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="export-filter" value="completed">
-                        <span>Completed Records Only</span>
-                    </label>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-export" class="btn-secondary">Cancel</button>
-                <button id="confirm-export" class="btn-primary">Export</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Edit Report Modal -->
     <div id="edit-modal" class="modal hidden">
