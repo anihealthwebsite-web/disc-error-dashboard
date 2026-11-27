@@ -180,6 +180,24 @@ async function updateReportInSheets(reportId, updates) {
     return await response.json();
 }
 
+/**
+ * Delete a report from Google Sheets via SheetDB by ID
+ */
+async function deleteReportInSheets(reportId) {
+    if (!isGoogleSheetsConfigured()) throw new Error('SheetDB not configured');
+
+    const response = await fetch(`${SHEETDB_API_URL}/id/${encodeURIComponent(reportId)}?sheet=Reports`, {
+        method: 'DELETE'
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`SheetDB DELETE failed (${response.status}): ${text}`);
+    }
+
+    return await response.json();
+}
+
 // ========================================
 // CLINICS
 // ========================================

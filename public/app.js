@@ -1110,7 +1110,8 @@ function renderList(data) {
                 <span class="sales-name">${item.staff_name || ''}</span>
                  <div style="display:flex; gap:0.5rem;">
                      ${currentUser && currentUser.role === 'Admin'
-                ? `<button class="btn-icon" title="Edit Report" onclick="handleEdit('${item.id}')">✏️</button>`
+                ? `<button class="btn-icon" title="Edit Report" onclick="handleEdit('${item.id}')">✏️</button>
+                   <button class="btn-icon" title="Delete Report" onclick="handleDelete('${item.id}')" style="color:#f87171;">🗑️</button>`
                 : ''}
                      ${item.status !== 'Completed'
                 ? `<button class="status-btn" onclick="openCompletionModal('${item.id}')">Mark Complete</button>`
@@ -1135,6 +1136,36 @@ let editingReport = null;
 let allReports = [];
 
 // Expose to window for inline onclick (backup) or external calls
+window.handleDelete = async function (id) {
+    if (!currentUser || currentUser.role !== 'Admin') {
+        alert("Unauthorized: Only Admins can delete reports.");
+        return;
+    }
+
+    const item = allReports.find(r => r.id == id);
+    const label = item ? `${item.clinic_name || 'Unknown'} (${item.error_date || item.lot_number || id})` : id;
+    if (!confirm(`Delete this report?\n\n${label}\n\nThis will permanently remove it from Google Sheets.`)) {
+        return;
+    }
+
+    try {
+        if (getActiveBackend() === 'google_sheets' && typeof deleteReportInSheets === 'function') {
+            await deleteReportInSheets(id);
+        } else if (_supabase) {
+            const { error } = await _supabase.from('report').delete().eq('id', id);
+            if (error) throw error;
+        }
+
+        selectedExportIds.delete(String(id));
+        allReports = allReports.filter(r => r.id != id);
+        updateSelectedCountUI();
+        applyWorklistFilter();
+    } catch (err) {
+        console.error("Delete failed:", err);
+        alert("Failed to delete report: " + err.message);
+    }
+};
+
 window.handleEdit = function (id) {
     console.log("Edit requested for ID:", id);
     const item = allReports.find(r => r.id == id);
